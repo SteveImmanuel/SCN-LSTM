@@ -75,14 +75,14 @@ class S2VT(torch.nn.Module):
 
             # right shift by one for concatenating output from first lstm
             caption = caption[:, :-1]
-            pad_zero = torch.zeros(caption.shape[0], 1).cuda()
+            pad_zero = torch.zeros(caption.shape[0], 1).cuda().long()
             caption = torch.cat((pad_zero, caption), 1).cuda()
             # dim (BATCH_SIZE, timestep, lstm_hidden_size)
             caption = self.caption_embedding(caption)
 
             # concatenate output from first lstm with caption
             x = torch.cat((x, caption), 2)
-            x = self.second_lstm(x)
+            x, _ = self.second_lstm(x)
             x = self.dropout(x)
             x = self.linear_last(x)
             return self.softmax(x)
