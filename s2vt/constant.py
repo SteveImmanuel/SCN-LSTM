@@ -1,0 +1,2 @@
+EOS_TAG = '<EOS>'
+BOS_TAG = '<BOS>'
