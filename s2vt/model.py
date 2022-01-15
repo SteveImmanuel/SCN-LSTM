@@ -1,6 +1,7 @@
 import torch
 import torchvision.models as models
 from typing import Tuple
+from s2vt.constant import *
 
 
 class S2VT(torch.nn.Module):
@@ -38,7 +39,7 @@ class S2VT(torch.nn.Module):
         self.relu = torch.nn.ReLU()
 
     def _initialize_vgg(self):
-        vgg = models.vgg16(pretrained=True).cuda()
+        vgg = models.vgg16(pretrained=True).to(DEVICE)
         for param in vgg.parameters():
             param.requires_grad = False
         # use output from fc7, remove the rest
@@ -64,7 +65,7 @@ class S2VT(torch.nn.Module):
             temp_extracted = self.video_embedding(temp_extracted)
             extracted_features.append(temp_extracted)
 
-        extracted_features = torch.cat(extracted_features, 0).cuda()
+        extracted_features = torch.cat(extracted_features, 0).to(DEVICE)
         extracted_features = extracted_features.view(batch_size, self.timestep, -1)
         # output from CNN extractor (BATCH_SIZE, timestep, lstm_input_size)
 
@@ -73,8 +74,8 @@ class S2VT(torch.nn.Module):
 
             # right shift by one for concatenating output from first lstm
             caption = caption[:, :-1]
-            pad_zero = torch.zeros(caption.shape[0], 1).cuda().long()
-            caption = torch.cat((pad_zero, caption), 1).cuda()
+            pad_zero = torch.zeros(caption.shape[0], 1).to(DEVICE).long()
+            caption = torch.cat((pad_zero, caption), 1).to(DEVICE)
             # dim (BATCH_SIZE, timestep, lstm_hidden_size)
             caption = self.caption_embedding(caption)
 
