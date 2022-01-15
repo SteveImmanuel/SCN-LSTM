@@ -51,11 +51,12 @@ class MSVDDataset(Dataset):
             image_seq.append(image.unsqueeze(0))
 
         image_seq_len = len(image_seq)
-        assert image_seq_len > 0 and image_seq_len <= 80, video_name
+        assert image_seq_len > 0 and image_seq_len <= 55, f'Error in loading {video_name}, len={image_seq_len}'
 
-        # output dim = (timestep, channel, height, width)
-        # note that the video is not padded here, but in the model forward method
-        # because I need to get the video sequence length during inferencing
+        image_dim = image_seq[0].shape
+        # pad with zero for the remaining timestep
+        pad_zero = torch.zeros(self.timestep - image_seq_len, *image_dim[1:])
+        image_seq.append(pad_zero)
         video_data = torch.cat(image_seq, 0)
 
         # get label
@@ -76,4 +77,4 @@ class MSVDDataset(Dataset):
             torch.zeros(self.timestep - len(annot_raw) - (image_seq_len - 1))
         ], 0).long()
 
-        return (video_data, (label_annotation, annot_mask))
+        return ((video_data, image_seq_len), (label_annotation, annot_mask))

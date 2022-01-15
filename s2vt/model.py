@@ -1,5 +1,6 @@
 import torch
 import torchvision.models as models
+from typing import Tuple
 
 
 class S2VT(torch.nn.Module):
@@ -44,34 +45,32 @@ class S2VT(torch.nn.Module):
         vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:4])
         return vgg
 
-    def forward(self, x: torch.Tensor, caption: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, data: Tuple[torch.Tensor, int], caption: torch.Tensor = None) -> torch.Tensor:
         """Forward propagate
 
         Args:
-            x (torch.Tensor): (BATCH_SIZE, image_sequence_length, channel, height, width)
+            x (torch.Tensor): (BATCH_SIZE, timestep, channel, height, width)
             caption (torch.Tensor): (BATCH_SIZE, timestep, vocab_size)
         Returns:
             model inference result 
                 if training (BATCH_SIZE, timestep, vocab_size)
                 else (BATCH_SIZE, length until EOS tag emitted, vocab_size)
         """
-        batch_size, image_seq_len, _, _, _ = x.shape
+        x, image_seq_len = data
+        batch_size, _, _, _, _ = x.shape
         extracted_features = []
-        for i in range(x.shape[1]):
+        for i in range(self.timestep):
             temp_extracted = self.cnn_extractor(x[:, i, :, :, :])
             temp_extracted = self.video_embedding(temp_extracted)
             extracted_features.append(temp_extracted)
 
-        extracted_features = torch.cat(extracted_features, 0)
-        extracted_features = extracted_features.view(batch_size, image_seq_len, -1)
-        # output from CNN extractor (BATCH_SIZE, image_sequence_length, lstm_input_size)
+        extracted_features = torch.cat(extracted_features, 0).cuda()
+        extracted_features = extracted_features.view(batch_size, self.timestep, -1)
+        # output from CNN extractor (BATCH_SIZE, timestep, lstm_input_size)
 
         if self.training:
-            # pad with zero for the remaining timestep
-            pad_zero = torch.zeros(batch_size, self.timestep - image_seq_len, self.lstm_input_size).cuda()
-            x = torch.cat((extracted_features, pad_zero), 1).cuda()
-
-            x, _ = self.first_lstm(x)
+            print(extracted_features.shape)
+            x, _ = self.first_lstm(extracted_features)
 
             # right shift by one for concatenating output from first lstm
             caption = caption[:, :-1]
