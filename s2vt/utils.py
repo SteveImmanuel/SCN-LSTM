@@ -1,14 +1,81 @@
 import cv2
 import os
-from typing import Tuple
+from typing import Tuple, Dict, List
+from s2vt.constant import *
 
 
-def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)):
+def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
+    """Build vocab for annotation_file
+
+    Args:
+        annotation_file (str): [description]
+    Returns:
+        (word_to_idx dict, idx_to_word dict, video_mapping dict)
+    """
+
+    word_to_idx = {}
+    video_mapping = {}
+    idx = 0
+
+    with open(annotation_file, 'r') as annot:
+        line = annot.readline()
+        while line:
+            line = annot.readline()
+            line = line.strip('\n')
+            tokens = line.split(' ')
+            video_name = tokens[0]
+            video_annot = [x.lower() for x in tokens[1:]]
+            video_annot = [BOS_TAG] + video_annot + [EOS_TAG]
+
+            for word in video_annot:
+                if word not in word_to_idx:
+                    word_to_idx[word] = idx
+                    idx += 1
+
+            if video_name in video_mapping:
+                video_mapping[video_name].append(video_annot)
+            else:
+                video_mapping[video_name] = [video_annot]
+
+    idx_to_word = {idx: word for word, idx in word_to_idx.items()}
+    return (word_to_idx, idx_to_word, video_mapping)
+
+
+def annotation_to_idx(annotation: List[str], word_to_idx: Dict) -> List[int]:
+    """Converts str annotation into integer indexes
+
+    Args:
+        annotation (List[str]): [description]
+
+    Returns:
+        List[int]: [description]
+    """
+    return [word_to_idx[x] for x in annotation]
+
+
+def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[int]:
+    """Converts integer indexes into annotation
+
+    Args:
+        annotation (List[str]): [description]
+
+    Returns:
+        List[int]: [description]
+    """
+    return [idx_to_word[x] for x in idxs]
+
+
+def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)) -> None:
+    """Converts all videos in root_path to sequence of images to each own directory
+
+    Args:
+        root_path (str, optional): [description]. Defaults to '.'.
+        output_dim (Tuple, optional): [description]. Defaults to (224, 224).
+    """
     allowed_ext = ['.avi', '.mp4']
 
     all_videos = [
-        video for video in os.listdir(root_path)
-        if os.path.splitext(video)[-1] in allowed_ext
+        video for video in os.listdir(root_path) if os.path.splitext(video)[-1] in allowed_ext
     ]
     total_videos = len(all_videos)
     print(f'Found {total_videos} videos')
@@ -29,7 +96,13 @@ def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)):
             count += 1
 
 
-def frames_to_video(root_path: str = '.'):
+def frames_to_video(root_path: str = '.') -> None:
+    """Converts all sequence of frames inside each subdirectory in root_path
+    to videos. This is the reverse of video_to_frames function
+
+    Args:
+        root_path (str, optional): [description]. Defaults to '.'.
+    """
     allowed_ext = ['.tif', '.jpg', '.jpeg', '.png']
 
     all_videos = [video for video in next(os.walk(root_path))][1]
@@ -48,8 +121,7 @@ def frames_to_video(root_path: str = '.'):
         if len(all_frames) > 0:
             temp_frame = cv2.imread(f'{root_path}/{video}/{all_frames[0]}')
             height, width, channel = temp_frame.shape
-            video_writer = cv2.VideoWriter(f'{root_path}/{video}.mp4', fourcc,
-                                           fps, (width, height))
+            video_writer = cv2.VideoWriter(f'{root_path}/{video}.mp4', fourcc, fps, (width, height))
 
             for frame_path in all_frames:
                 frame = cv2.imread(f'{root_path}/{video}/{frame_path}')
