@@ -35,14 +35,14 @@ class S2VT(torch.nn.Module):
         self.video_embedding = torch.nn.Linear(cnn_out_size, lstm_input_size)
         self.linear_last = torch.nn.Linear(lstm_hidden_size, vocab_size)
         self.dropout = torch.nn.Dropout(drop_out_rate)
-        self.softmax = torch.nn.Softmax(dim=2)
+        self.relu = torch.nn.ReLU()
 
     def _initialize_vgg(self):
         vgg = models.vgg16(pretrained=True).cuda()
         for param in vgg.parameters():
             param.requires_grad = False
-        # use output from fc6, remove the rest
-        vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:4])
+        # use output from fc7, remove the rest
+        vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:-1])
         return vgg
 
     def forward(self, data: Tuple[torch.Tensor, int], caption: torch.Tensor = None) -> torch.Tensor:
@@ -83,7 +83,8 @@ class S2VT(torch.nn.Module):
             x, _ = self.second_lstm(x)
             x = self.dropout(x)
             x = self.linear_last(x)
-            return self.softmax(x)
+            x = self.relu(x)
+            return x
         else:
             raise NotImplementedError()
         # image_dim = image_seq[0].shape
