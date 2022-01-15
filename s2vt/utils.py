@@ -54,7 +54,7 @@ def annotation_to_idx(annotation: List[str], word_to_idx: Dict) -> List[int]:
     return [word_to_idx[x] for x in annotation]
 
 
-def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[int]:
+def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[str]:
     """Converts integer indexes into annotation
 
     Args:
@@ -63,7 +63,7 @@ def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[int]:
     Returns:
         List[int]: [description]
     """
-    return [idx_to_word[x] for x in idxs]
+    return [idx_to_word[x] if x in idx_to_word else '' for x in idxs]
 
 
 def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)) -> None:
