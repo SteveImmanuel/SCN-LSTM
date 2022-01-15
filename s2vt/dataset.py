@@ -39,8 +39,10 @@ class MSVDDataset(Dataset):
         # get video data
         video_path = os.path.join(self.dataset_path, video_name)
         img_list = os.listdir(video_path)
+        # max image sequence set to 50 frames, otherwise use sample rate
+        step_size = max(len(img_list) // 50, int(1 / self.sample_rate))
         image_seq = []
-        for i in range(0, len(img_list), int(1 / self.sample_rate)):
+        for i in range(0, len(img_list), step_size):
             image_path = os.path.join(video_path, img_list[i])
             image = read_image(image_path).type(torch.float32)
 
@@ -49,7 +51,7 @@ class MSVDDataset(Dataset):
             image_seq.append(image.unsqueeze(0))
 
         image_seq_len = len(image_seq)
-        assert image_seq_len > 0
+        assert image_seq_len > 0 and image_seq_len <= 80, video_name
 
         # output dim = (timestep, channel, height, width)
         # note that the video is not padded here, but in the model forward method
@@ -71,7 +73,7 @@ class MSVDDataset(Dataset):
         annot_mask = torch.cat([
             torch.zeros(image_seq_len - 1),
             torch.ones(len(annot_raw)),
-            torch.zeros((self.timestep - len(annot_raw) - (image_seq_len - 1)))
+            torch.zeros(self.timestep - len(annot_raw) - (image_seq_len - 1))
         ], 0).long()
 
         return (video_data, (label_annotation, annot_mask))
