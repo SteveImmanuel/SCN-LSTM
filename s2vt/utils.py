@@ -15,7 +15,8 @@ def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
 
     word_to_idx = {}
     video_mapping = {}
-    idx = 0
+    # start from 1 so that index 0 is reserved for padding
+    idx = 1
 
     with open(annotation_file, 'r') as annot:
         line = annot.readline()
@@ -74,9 +75,7 @@ def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)) -> Non
     """
     allowed_ext = ['.avi', '.mp4']
 
-    all_videos = [
-        video for video in os.listdir(root_path) if os.path.splitext(video)[-1] in allowed_ext
-    ]
+    all_videos = [video for video in os.listdir(root_path) if os.path.splitext(video)[-1] in allowed_ext]
     total_videos = len(all_videos)
     print(f'Found {total_videos} videos')
 
@@ -113,10 +112,8 @@ def frames_to_video(root_path: str = '.') -> None:
 
     for video in all_videos:
         print('Processing', video)
-        all_frames = sorted([
-            frame for frame in os.listdir(f'{root_path}/{video}')
-            if os.path.splitext(frame)[-1] in allowed_ext
-        ])
+        all_frames = sorted(
+            [frame for frame in os.listdir(f'{root_path}/{video}') if os.path.splitext(frame)[-1] in allowed_ext])
 
         if len(all_frames) > 0:
             temp_frame = cv2.imread(f'{root_path}/{video}/{all_frames[0]}')
