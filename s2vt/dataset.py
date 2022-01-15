@@ -63,7 +63,7 @@ class MSVDDataset(Dataset):
         annot_idx = random.randint(0, len(self.video_mapping[video_name]) - 1)
         annot_raw = self.video_mapping[video_name][annot_idx]
         # pad ending annotation with <BOS> until the length matches timestep
-        annot_padded = annot_raw + [BOS_TAG] * (self.timestep - len(annot_raw) - (image_seq_len - 1))
+        annot_padded = annot_raw + [EOS_TAG] * (self.timestep - len(annot_raw) - (image_seq_len - 1))
 
         annotation = annotation_to_idx(annot_padded, self.word_to_idx)
         annotation = torch.FloatTensor(annotation)
