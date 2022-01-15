@@ -67,11 +67,11 @@ class MSVDDataset(Dataset):
         # pad beggining with zero
         pad_zero = torch.zeros(image_seq_len - 1)
         # output dim = (timestep)
-        label_annotation = torch.cat([pad_zero, annotation], 0)
+        label_annotation = torch.cat([pad_zero, annotation], 0).long()
         annot_mask = torch.cat([
             torch.zeros(image_seq_len - 1),
             torch.ones(len(annot_raw)),
             torch.zeros((self.timestep - len(annot_raw) - (image_seq_len - 1)))
-        ], 0)
+        ], 0).long()
 
         return (video_data, (label_annotation, annot_mask))
