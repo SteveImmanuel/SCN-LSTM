@@ -6,6 +6,7 @@ from s2vt.utils import *
 from s2vt.dataset import MSVDDataset
 from s2vt.model import S2VT
 from s2vt.constant import *
+from s2vt.utils import *
 
 parser = argparse.ArgumentParser(description='S2VT Implementation using PyTorch')
 parser.add_argument('--annotation-path', help='File path to annotation', required=True)
@@ -51,7 +52,7 @@ dataset = MSVDDataset(
     timestep=timestep,
 )
 dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size)
-model = S2VT(vocab_size=dataset.get_vocab_size(), timestep=timestep).to(DEVICE)
+model = S2VT(word_to_idx=dataset.word_to_idx, vocab_size=dataset.get_vocab_size(), timestep=timestep).to(DEVICE)
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 loss_func = torch.nn.CrossEntropyLoss(reduction='none')
 
@@ -79,4 +80,11 @@ for i in range(epoch):
     optimizer.step()
 
     print(batch_loss)
+
 torch.save(model.state_dict(), './checkpoints/test.pt')
+model.load_state_dict(torch.load('./checkpoints/test.pt'))
+model.eval()
+out = model((X, seq_len))
+print(out[0].type())
+print(idx_to_annotation(out[0].tolist(), dataset.idx_to_word))
+print(idx_to_annotation(y[0].tolist(), dataset.idx_to_word))
