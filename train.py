@@ -25,8 +25,8 @@ for i in range(10):
 
         batch_loss = torch.zeros(dataloader.batch_size)
         for i in range(dataloader.batch_size):
-            loss = loss_func(out, y)
-            loss *= y_mask
+            loss = loss_func(out[i], y[i])
+            loss *= y_mask[i]
             loss = torch.sum(loss)
             batch_loss[i] = loss
         batch_loss = torch.mean(batch_loss)
