@@ -69,7 +69,6 @@ class S2VT(torch.nn.Module):
         # output from CNN extractor (BATCH_SIZE, timestep, lstm_input_size)
 
         if self.training:
-            print(extracted_features.shape)
             x, _ = self.first_lstm(extracted_features)
 
             # right shift by one for concatenating output from first lstm
