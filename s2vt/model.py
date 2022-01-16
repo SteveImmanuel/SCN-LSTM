@@ -57,7 +57,7 @@ class S2VT(torch.nn.Module):
             caption (torch.Tensor): (BATCH_SIZE, timestep)
         Returns:
             model inference result 
-                if training (BATCH_SIZE, timestep, vocab_size)
+                if training, raw unnormalized scores for each class (BATCH_SIZE, timestep, vocab_size)
                 else (BATCH_SIZE, timestep, vocab_size)
         """
         x, image_seq_len = data
