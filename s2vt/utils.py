@@ -127,6 +127,26 @@ def frames_to_video(root_path: str = '.') -> None:
             video_writer.release()
 
 
+def split_train_val_test(root_path: str = '.') -> None:
+    """Split data into traininig, validation, and test
+    only call this function after all videos has been converted into frames to each own subdirectory
+    by calling video_to_frames. Video 1-1200 will be for training, video 1201-1300 will be for validation,
+    and video 1301-1970 will be for testing 
+
+    Args:
+        root_path (str, optional): [description]. Defaults to '.'.
+    """
+    videos = os.listdir(root_path)
+    subdir = {'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}
+
+    for subdir_name, index_range in subdir.items():
+        os.makedirs(subdir_name, exist_ok=True)
+        for i in range(index_range[0], index_range[1] + 1):
+            source_path = os.path.join(root_path, videos[i])
+            dest_path = os.path.join(root_path, subdir_name, videos[i])
+            shutil.move(source_path, dest_path)
+
+
 if __name__ == '__main__':
     # video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
     split_train_val_test('D:/ML Dataset/MSVD/YouTubeClips')
