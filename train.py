@@ -1,6 +1,7 @@
 import os
 import argparse
 import torch
+import time
 from datetime import datetime
 from torchvision.transforms import RandomCrop, Normalize
 from torch.utils.data import DataLoader
@@ -13,8 +14,8 @@ parser = argparse.ArgumentParser(description='S2VT Implementation using PyTorch'
 parser.add_argument('--annotation-path', help='File path to annotation', required=True)
 parser.add_argument('--train-data-dir', help='Directory path to training annotation', required=True)
 parser.add_argument('--val-data-dir', help='Directory path to training images', required=True)
-parser.add_argument('--ckpt-dir', help='Checkpoint directory, will save for each epoch')
-parser.add_argument('--log-dir', help='Log directory')
+parser.add_argument('--ckpt-dir', help='Checkpoint directory, will save for each epoch', default='./checkpoints')
+parser.add_argument('--log-dir', help='Log directory', default='./logs')
 parser.add_argument('--timestep', help='Total timestep', default=80, type=int)
 parser.add_argument('--batch-size', help='Batch size for training', default=8, type=int)
 parser.add_argument('--epoch', help='Total epoch', default=20, type=int)
@@ -37,6 +38,7 @@ learning_rate = args.learning_rate
 model_path = args.model_path
 test_overfit = args.test_overfit
 ckpt_dir = args.ckpt_dir
+log_dir = args.log_dir
 
 # show training config
 print('\n######### TRAINING CONFIGURATION #########')
@@ -44,6 +46,7 @@ print('Annotation file:', annotation_path)
 print('Training directory:', train_data_dir)
 print('Validation directory:', val_data_dir)
 print('Checkpoint directory:', ckpt_dir)
+print('Log directory:', log_dir)
 print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
 print('Epoch:', epoch)
@@ -108,6 +111,12 @@ if test_overfit:
 
 else:
     try:
+        uid = int(time.time())
+        batch_loss_log_path = os.path.join(log_dir, f'{uid}_batch_loss.csv')
+        epoch_loss_log_path = os.path.join(log_dir, f'{uid}_epoch_loss.csv')
+        batch_loss_log = create_batch_log_file(batch_loss_log_path)
+        epoch_loss_log = create_epoch_log_file(epoch_loss_log_path)
+
         train_dataloader_len = len(train_dataloader)
         val_dataloader_len = len(val_dataloader)
 
@@ -137,6 +146,8 @@ else:
 
                 train_batch_losses[batch_idx] = batch_loss.item()
                 print_batch_loss(batch_loss.item(), batch_idx + 1, train_dataloader_len)
+                batch_loss_log.write(f'{epoch_idx*train_dataloader_len+batch_idx},{batch_loss.item()}\n')
+                batch_loss_log.flush()
 
             print('\nValidation Phase')
             for batch_idx, ((X, seq_len), (y, y_mask)) in enumerate(val_dataloader):
@@ -159,6 +170,8 @@ else:
             avg_train_loss = torch.mean(train_batch_losses).item()
             avg_val_loss = torch.mean(val_batch_losses).item()
             print(f'\nTrain Loss: {avg_train_loss:.5f}, Validation Loss: {avg_val_loss:.5f}')
+            epoch_loss_log.write(f'{epoch_idx},{avg_train_loss},{avg_val_loss}\n')
+            epoch_loss_log.flush()
 
             # save model checkpoint
             if ckpt_dir:
@@ -177,5 +190,9 @@ else:
             filepath = os.path.join(ckpt_dir, filename)
             torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
             print(f'Model saved to {filepath}')
+
+    finally:
+        batch_loss_log.close()
+        epoch_loss_log.close()
 
 # python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 20 --learning-rate 1e-3
