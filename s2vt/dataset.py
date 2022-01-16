@@ -36,8 +36,8 @@ class MSVDDataset(Dataset):
         # get video data
         video_path = os.path.join(self.dataset_path, video_name)
         img_list = os.listdir(video_path)
-        # max image sequence set to 50 frames, otherwise use sample rate
-        step_size = max(len(img_list) // 50, int(1 / self.sample_rate))
+        # max image sequence set to 45 frames, otherwise use sample rate
+        step_size = max(len(img_list) // 45, int(1 / self.sample_rate))
         image_seq = []
         for i in range(0, len(img_list), step_size):
             image_path = os.path.join(video_path, img_list[i])
@@ -48,7 +48,7 @@ class MSVDDataset(Dataset):
             image_seq.append(image.unsqueeze(0))
 
         image_seq_len = len(image_seq)
-        assert image_seq_len > 0 and image_seq_len <= 55, f'Video too long {video_name}, len={image_seq_len} frames'
+        assert image_seq_len > 0 and image_seq_len <= 50, f'Video too long {video_name}, len={image_seq_len} frames'
 
         image_dim = image_seq[0].shape
         # pad with zero for the remaining timestep
