@@ -51,7 +51,7 @@ class MSVDDataset(Dataset):
             image_seq.append(image.unsqueeze(0))
 
         image_seq_len = len(image_seq)
-        assert image_seq_len > 0 and image_seq_len <= 55, f'Error in loading {video_name}, len={image_seq_len}'
+        assert image_seq_len > 0 and image_seq_len <= 55, f'Video too long {video_name}, len={image_seq_len} frames'
 
         image_dim = image_seq[0].shape
         # pad with zero for the remaining timestep
@@ -71,6 +71,10 @@ class MSVDDataset(Dataset):
         pad_zero = torch.zeros(image_seq_len - 1)
         # output dim = (timestep)
         label_annotation = torch.cat([pad_zero, annotation], 0).long()
+
+        assert self.timestep - len(annot_raw) - (
+            image_seq_len - 1) >= 0, f'Annotation too long for video {video_name}, len={len(annot_raw)} words'
+
         annot_mask = torch.cat([
             torch.zeros(image_seq_len - 1),
             torch.ones(len(annot_raw)),
