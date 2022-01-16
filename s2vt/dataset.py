@@ -27,9 +27,6 @@ class MSVDDataset(Dataset):
         self.timestep = timestep
         self.sample_rate = sample_rate
 
-    def get_vocab_size(self) -> int:
-        return self.vocab_size
-
     def __len__(self):
         return len(self.videos)
 
