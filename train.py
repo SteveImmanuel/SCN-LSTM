@@ -1,5 +1,7 @@
-import torch
+import os
 import argparse
+import torch
+from datetime import datetime
 from torchvision.transforms import RandomCrop, Normalize
 from torch.utils.data import DataLoader
 from s2vt.dataset import MSVDDataset
@@ -16,7 +18,8 @@ parser.add_argument('--batch-size', help='Batch size for training', default=8, t
 parser.add_argument('--epoch', help='Total epoch', default=20, type=int)
 parser.add_argument('--learning-rate', help='Learning rate for training', default=1e-4, type=float)
 parser.add_argument('--model-path', help='Load pretrained model')
-parser.add_argument('--ckpt-path', help='Checkpoint path, will save for each epoch')
+parser.add_argument('--ckpt-dir', help='Checkpoint directory path, will save for each epoch')
+parser.add_argument('--log-dir', help='Log directory')
 parser.add_argument(
     '--test-overfit',
     help='Sanity check to test overfit model with very small dataset',
@@ -33,16 +36,18 @@ epoch = args.epoch
 learning_rate = args.learning_rate
 model_path = args.model_path
 test_overfit = args.test_overfit
+ckpt_dir = args.ckpt_dir
 
 # show training config
 print('\n######### TRAINING CONFIGURATION #########')
 print('Annotation file:', annotation_path)
 print('Training directory:', train_data_dir)
 print('Validation directory:', val_data_dir)
+print('Checkpoint directory:', ckpt_dir)
+print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
 print('Epoch:', epoch)
 print('Learning rate:', learning_rate)
-print('Model path:', model_path)
 print('Test overfit:', test_overfit)
 
 # prepare train and validation dataset
@@ -152,6 +157,14 @@ else:
 
         avg_train_loss = torch.mean(train_batch_losses).item()
         avg_val_loss = torch.mean(val_batch_losses).item()
-        print(f'Train Loss: {avg_train_loss:.5f}, Validation Loss: {avg_val_loss:.5f}')
+        print(f'\nTrain Loss: {avg_train_loss:.5f}, Validation Loss: {avg_val_loss:.5f}')
 
-# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train " --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 20 --learning-rate 1e-4
+        # save model checkpoint
+        if ckpt_dir:
+            timestamp = datetime.strftime(datetime.now(), '%d-%H-%M')
+            filename = f'{timestamp}_{avg_train_loss:.3f}_{avg_val_loss:.3f}.pth'
+            filepath = os.path.join(ckpt_dir, filename)
+            torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
+            print(f'Model saved to {filepath}')
+
+# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 20 --learning-rate 1e-3
