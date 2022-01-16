@@ -22,7 +22,6 @@ def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
     with open(annotation_file, 'r') as annot:
         line = annot.readline()
         while line:
-            line = annot.readline()
             line = line.strip('\n')
             tokens = line.split(' ')
             video_name = tokens[0]
@@ -38,6 +37,7 @@ def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
                 video_mapping[video_name].append(video_annot)
             else:
                 video_mapping[video_name] = [video_annot]
+            line = annot.readline()
 
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
     return (word_to_idx, idx_to_word, video_mapping)
