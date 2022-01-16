@@ -1,5 +1,6 @@
 import cv2
 import os
+import shutil
 from typing import Tuple, Dict, List
 from s2vt.constant import *
 
@@ -13,8 +14,8 @@ def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
         (word_to_idx dict, idx_to_word dict, video_mapping dict)
     """
 
-    word_to_idx = {}
     video_mapping = {}
+    word_to_idx = {PAD_TAG: 0}
     # start from 1 so that index 0 is reserved for padding
     idx = 1
 
@@ -51,7 +52,7 @@ def annotation_to_idx(annotation: List[str], word_to_idx: Dict) -> List[int]:
     Returns:
         List[int]: [description]
     """
-    return [word_to_idx[x] for x in annotation]
+    return [word_to_idx[x] if x in word_to_idx else -1 for x in annotation]
 
 
 def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[str]:
@@ -63,7 +64,7 @@ def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[str]:
     Returns:
         List[int]: [description]
     """
-    return [idx_to_word[x] if x in idx_to_word else '' for x in idxs]
+    return [idx_to_word[x] if x in idx_to_word else UNKNOWN_TAG for x in idxs]
 
 
 def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)) -> None:
@@ -127,4 +128,5 @@ def frames_to_video(root_path: str = '.') -> None:
 
 
 if __name__ == '__main__':
-    video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
+    # video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
+    split_train_val_test('D:/ML Dataset/MSVD/YouTubeClips')
