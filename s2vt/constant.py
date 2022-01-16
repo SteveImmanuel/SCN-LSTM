@@ -1,5 +1,7 @@
 import torch
 
+UNKNOWN_TAG = '<UNK>'
+PAD_TAG = '<PAD>'
 EOS_TAG = '<EOS>'
 BOS_TAG = '<BOS>'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
