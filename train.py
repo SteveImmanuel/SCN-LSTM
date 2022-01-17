@@ -20,6 +20,7 @@ parser.add_argument('--timestep', help='Total timestep', default=80, type=int)
 parser.add_argument('--batch-size', help='Batch size for training', default=8, type=int)
 parser.add_argument('--epoch', help='Total epoch', default=20, type=int)
 parser.add_argument('--learning-rate', help='Learning rate for training', default=1e-4, type=float)
+parser.add_argument('--momentum', help='Learning rate for training', default=1e-1, type=float)
 parser.add_argument('--model-path', help='Load pretrained model')
 parser.add_argument(
     '--test-overfit',
@@ -35,6 +36,7 @@ timestep = args.timestep
 batch_size = args.batch_size
 epoch = args.epoch
 learning_rate = args.learning_rate
+momentum = args.momentum
 model_path = args.model_path
 test_overfit = args.test_overfit
 ckpt_dir = args.ckpt_dir
@@ -51,6 +53,7 @@ print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
 print('Epoch:', epoch)
 print('Learning rate:', learning_rate)
+print('Momentum:', momentum)
 print('Test overfit:', test_overfit)
 
 # prepare train and validation dataset
@@ -82,7 +85,7 @@ if model_path and not test_overfit:
     model.load_state_dict(torch.load(model_path))
 model.train()
 
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 loss_func = torch.nn.CrossEntropyLoss(reduction='none')
 
 if test_overfit:
