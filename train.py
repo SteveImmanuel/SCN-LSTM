@@ -78,7 +78,8 @@ model = S2VT(
 ).to(DEVICE)
 
 if model_path and not test_overfit:
-    model.load_state_dict(torch.load('./checkpoints/test.pt'))
+    print(f'\nLoading pretrained model in {model_path}\n')
+    model.load_state_dict(torch.load(model_path))
 model.train()
 
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
@@ -195,4 +196,4 @@ else:
         batch_loss_log.close()
         epoch_loss_log.close()
 
-# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 20 --learning-rate 1e-3
+# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 5 --learning-rate 1e-3
