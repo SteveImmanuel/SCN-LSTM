@@ -4,6 +4,7 @@ import torch
 import time
 from datetime import datetime
 from torchvision.transforms import RandomCrop, Normalize
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from s2vt.dataset import MSVDDataset
 from s2vt.model import S2VT
@@ -15,12 +16,14 @@ parser.add_argument('--annotation-path', help='File path to annotation', require
 parser.add_argument('--train-data-dir', help='Directory path to training annotation', required=True)
 parser.add_argument('--val-data-dir', help='Directory path to training images', required=True)
 parser.add_argument('--ckpt-dir', help='Checkpoint directory, will save for each epoch', default='./checkpoints')
+parser.add_argument('--ckpt-interval', help='How many epoch between checkpoints', default=1, type=int)
 parser.add_argument('--log-dir', help='Log directory', default='./logs')
 parser.add_argument('--timestep', help='Total timestep', default=80, type=int)
 parser.add_argument('--batch-size', help='Batch size for training', default=8, type=int)
 parser.add_argument('--epoch', help='Total epoch', default=20, type=int)
 parser.add_argument('--learning-rate', help='Learning rate for training', default=1e-4, type=float)
-parser.add_argument('--momentum', help='Learning rate for training', default=1e-1, type=float)
+parser.add_argument('--momentum', help='Momentum for updating gradient', default=9e-1, type=float)
+parser.add_argument('--gamma', help='Gamma for learning rate scheduler', default=5e-1, type=float)
 parser.add_argument('--model-path', help='Load pretrained model')
 parser.add_argument(
     '--test-overfit',
@@ -37,9 +40,11 @@ batch_size = args.batch_size
 epoch = args.epoch
 learning_rate = args.learning_rate
 momentum = args.momentum
+gamma = args.gamma
 model_path = args.model_path
 test_overfit = args.test_overfit
 ckpt_dir = args.ckpt_dir
+ckpt_interval = args.ckpt_interval
 log_dir = args.log_dir
 
 # show training config
@@ -48,12 +53,14 @@ print('Annotation file:', annotation_path)
 print('Training directory:', train_data_dir)
 print('Validation directory:', val_data_dir)
 print('Checkpoint directory:', ckpt_dir)
+print('Checkpoint interval:', ckpt_interval)
 print('Log directory:', log_dir)
 print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
 print('Epoch:', epoch)
 print('Learning rate:', learning_rate)
 print('Momentum:', momentum)
+print('Gamma:', gamma)
 print('Test overfit:', test_overfit)
 
 # prepare train and validation dataset
@@ -86,6 +93,7 @@ if model_path and not test_overfit:
 model.train()
 
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+lr_scheduler = StepLR(optimizer, step_size=20, gamma=gamma)
 loss_func = torch.nn.CrossEntropyLoss(reduction='none')
 
 if test_overfit:
@@ -178,7 +186,7 @@ else:
             epoch_loss_log.flush()
 
             # save model checkpoint
-            if ckpt_dir:
+            if ckpt_dir and (epoch_idx % ckpt_interval == 0 or epoch_idx == epoch - 1):
                 timestamp = datetime.strftime(datetime.now(), '%d-%H-%M')
                 filename = f'{timestamp}_{avg_train_loss:.3f}_{avg_val_loss:.3f}.pth'
                 filepath = os.path.join(ckpt_dir, filename)
