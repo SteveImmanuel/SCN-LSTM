@@ -7,7 +7,32 @@ from typing import List
 from s2vt.utils import *
 
 
-class MSVDDataset(Dataset):
+class RawMSVDDataset(Dataset):
+    def __init__(
+        self,
+        video_path: str,
+        video_dict: Dict,
+        transform: List = None,
+    ):
+        assert os.path.exists(video_path)
+        self.video_path = video_path
+        self.images = sorted(os.listdir(video_path))
+        self.transform = transform
+        self.video_dict = video_dict
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx: int):
+        image_path = os.path.join(self.video_path, self.images[idx])
+        image = read_image(image_path).type(torch.float32) / 255.0
+        for transform in self.transform:
+            image = transform(image)
+
+        return (image, torch.empty(0))
+
+
+class PreprocessedMSVDDataset(Dataset):
     def __init__(
         self,
         dataset_path: str,
