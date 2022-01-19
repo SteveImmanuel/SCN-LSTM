@@ -49,6 +49,7 @@ class S2VT(torch.nn.Module):
             param.requires_grad = False
         # use output from fc7, remove the rest
         vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:-1])
+        vgg.eval()
         return vgg
 
     def forward(self, data: Tuple[torch.Tensor, int], caption: torch.Tensor = None) -> torch.Tensor:
