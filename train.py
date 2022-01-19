@@ -85,7 +85,7 @@ model = S2VT(
     word_to_idx=train_dataset.word_to_idx,
     vocab_size=train_dataset.vocab_size,
     timestep=timestep,
-    drop_out_rate=0.5,
+    drop_out_rate=0.1,
 ).to(DEVICE)
 
 if model_path and not test_overfit:
