@@ -41,7 +41,7 @@ class MSVDDataset(Dataset):
         image_seq = []
         for i in range(0, len(img_list), step_size):
             image_path = os.path.join(video_path, img_list[i])
-            image = read_image(image_path).type(torch.float32)
+            image = read_image(image_path).type(torch.float32) / 255.0
 
             for transform in self.transform:
                 image = transform(image)
