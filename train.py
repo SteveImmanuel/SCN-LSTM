@@ -193,6 +193,8 @@ else:
                 torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
                 print(f'Model saved to {filepath}')
 
+            lr_scheduler.step()
+
     except Exception as e:
         print(e)
         if ckpt_dir:
@@ -208,3 +210,5 @@ else:
         epoch_loss_log.close()
 
 # python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 5 --learning-rate 1e-3
+
+# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 10 --learning-rate 1e-3 --momentum 0.9 --gamma 0.5
