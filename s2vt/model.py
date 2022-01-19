@@ -38,8 +38,10 @@ class S2VT(torch.nn.Module):
         self.caption_embedding = torch.nn.Embedding(vocab_size, lstm_hidden_size)
         self.video_embedding = torch.nn.Linear(cnn_out_size, lstm_input_size)
         self.linear_last = torch.nn.Linear(lstm_hidden_size, vocab_size)
-        self.dropout = torch.nn.Dropout(drop_out_rate)
-        self.relu = torch.nn.ReLU()
+        self.dropout_video_embed = torch.nn.Dropout(drop_out_rate)
+        self.dropout_caption_embed = torch.nn.Dropout(drop_out_rate)
+        self.dropout_lstm_1 = torch.nn.Dropout(drop_out_rate)
+        self.dropout_lstm_2 = torch.nn.Dropout(drop_out_rate)
 
     def _initialize_vgg(self):
         vgg = models.vgg16(pretrained=True).to(DEVICE)
@@ -70,6 +72,7 @@ class S2VT(torch.nn.Module):
 
         extracted_features = torch.cat(extracted_features, 0).to(DEVICE)
         extracted_features = extracted_features.view(batch_size, self.timestep, -1)
+        extracted_features = self.dropout_video_embed(extracted_features)
         # output from CNN extractor (BATCH_SIZE, timestep, lstm_input_size)
         x, _ = self.first_lstm(extracted_features)
 
@@ -81,14 +84,17 @@ class S2VT(torch.nn.Module):
             # dim (BATCH_SIZE, timestep, lstm_hidden_size)
             caption = self.caption_embedding(caption)
 
+            caption = self.dropout_caption_embed(x)
+            x = self.dropout_lstm_1(x)
             # concatenate output from first lstm with caption
             x = torch.cat((x, caption), 2).to(DEVICE)
             x, _ = self.second_lstm(x)
-            x = self.dropout(x)
+            x = self.dropout_lstm_2(x)
             x = self.linear_last(x)
-            x = self.relu(x)
             return x
         else:
+            x = self.dropout_lstm_1(x)
+
             pad_zero = torch.zeros(batch_size, image_seq_len, self.lstm_hidden_size).to(DEVICE).long()
             encode_input = torch.cat((x[:, :image_seq_len, :], pad_zero), 2).to(DEVICE)
 
@@ -101,12 +107,12 @@ class S2VT(torch.nn.Module):
 
             for i in range(self.timestep - 1 - image_seq_len):  # timestep minus <BOS>, <EOS>, and image_seq_len
                 caption_out = self.caption_embedding(caption_out)
+                caption_out = self.dropout_caption_embed(caption_out)
                 decode_input = torch.cat((x[:, image_seq_len + i + 1, :], caption_out), 2).to(DEVICE)
 
                 result, (hn, cn) = self.second_lstm(decode_input, (hn, cn))
-                result = self.dropout(result)
-                result = self.linear_last(result)
-                result = self.relu(result)  # (BATCH_SIZE, 1, vocab_size)
+                result = self.dropout_lstm_2(result)
+                result = self.linear_last(result)  # (BATCH_SIZE, 1, vocab_size)
 
                 caption_out = torch.argmax(result, dim=2).to(DEVICE).long()
                 final_output[:, i + 1] = caption_out
