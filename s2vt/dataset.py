@@ -1,7 +1,7 @@
 import os
 import random
-from re import T
 import numpy as np
+import math
 import torch
 from torchvision.io import read_image
 from torch.utils.data import Dataset
@@ -39,14 +39,15 @@ class RawMSVDDataset(Dataset):
 
 class PreprocessedMSVDDataset(Dataset):
     """
-    Preprocessed raw image into extracted features and caption
+    Preprocessed raw image into extracted features and caption.
+    Image sequence and caption will both have the timestep sequences.
+    Image will be padded on the right, caption will be padded on the left
     """
     def __init__(
         self,
         dataset_path: str,
         annotation_file: str,
         timestep: int = 80,
-        sample_rate: float = 0.1,
     ):
         assert os.path.exists(dataset_path)
         assert os.path.exists(annotation_file)
@@ -57,7 +58,6 @@ class PreprocessedMSVDDataset(Dataset):
         self.video_dict = build_video_dict(annotation_file, reverse_key=True)
         self.vocab_size = len(self.word_to_idx)
         self.timestep = timestep
-        self.sample_rate = sample_rate
 
     def __len__(self):
         return len(self.videos)
@@ -69,51 +69,48 @@ class PreprocessedMSVDDataset(Dataset):
         # get video data
         video_path = os.path.join(self.dataset_path, video_idx)
         frame_list = sorted(os.listdir(video_path))
-        # max image sequence set to 45 frames, otherwise use sample rate
-        step_size = max(len(frame_list) // 45, int(1 / self.sample_rate))
+        # set frame sequence len to set to timestep, pad with zero until the len is timestep if neccessary
+        step_size = max(math.ceil(len(frame_list) / self.timestep), 1)
+
         frame_seq = []
         for i in range(0, len(frame_list), step_size):
             npy_path = os.path.join(video_path, frame_list[i])
             frame_features = np.load(npy_path)
             frame_seq.append(frame_features)
 
-        frame_seq_len = len(frame_seq)
-        assert frame_seq_len > 0 and frame_seq_len <= 50, f'Video too long {video_name}, len={frame_seq_len} frames'
-
         # pad with zero for the remaining timestep
-        pad_zero = np.zeros((self.timestep - frame_seq_len, *frame_seq[0].shape))
+        pad_zero = np.zeros((self.timestep - len(frame_seq), *frame_seq[0].shape))
         frame_seq = np.concatenate((pad_zero, frame_seq), axis=0)
         # output dim = (timestep, feature_dim)
         video_data = torch.FloatTensor(frame_seq)
 
         # get label
         annot_idx = random.randint(0, len(self.video_caption_mapping[video_name]) - 1)
-        annot_raw = self.video_caption_mapping[video_name][annot_idx]
-        # pad ending annotation with <BOS> until the length matches timestep
-        annot_padded = annot_raw + [EOS_TAG] * (self.timestep - len(annot_raw) - (frame_seq_len - 1))
+        annot_raw = self.video_caption_mapping[video_name][annot_idx]  # already contains BOS and EOS
+        annot_raw = annot_raw[1:]  # exclude BOS
+        # pad ending annotation with <EOS> until the length matches timestep
+        annot_padded = annot_raw + [EOS_TAG] * (self.timestep - len(annot_raw))
 
         annotation = annotation_to_idx(annot_padded, self.word_to_idx)
-        annotation = torch.FloatTensor(annotation)
-        # pad beggining with zero
-        pad_zero = torch.zeros(frame_seq_len - 1)
+        label_annotation = torch.LongTensor(annotation)
         # output dim = (timestep)
-        label_annotation = torch.cat([pad_zero, annotation], 0).long()
 
-        assert self.timestep - len(annot_raw) - (
-            frame_seq_len - 1) >= 0, f'Annotation too long for video {video_name}, len={len(annot_raw)} words'
+        assert self.timestep - len(
+            annot_raw) >= 0, f'Annotation too long for video {video_name}, len={len(annot_raw)} words'
 
-        annot_mask = torch.cat([
-            torch.zeros(frame_seq_len - 1),
-            torch.ones(len(annot_raw)),
-            torch.zeros(self.timestep - len(annot_raw) - (frame_seq_len - 1))
-        ], 0).long()
+        annot_mask = torch.cat(
+            [
+                torch.ones(len(annot_raw)),  # annotation + EOS tag
+                torch.zeros(self.timestep - len(annot_raw)),
+            ],
+            0).long()
 
-        return ((video_data, frame_seq_len), (label_annotation, annot_mask))
+        return (video_data, (label_annotation, annot_mask))
 
 
 class EndToEndMSVDDataset(Dataset):
     """
-    Complete from raw image and caption
+    Complete from raw image and caption. DEPRECATED DO NOT USE
     """
     def __init__(
         self,
