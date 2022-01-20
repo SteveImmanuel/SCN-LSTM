@@ -2,22 +2,23 @@ import os
 import argparse
 import torch
 import time
-from datetime import datetime
+import traceback
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
+from s2vt.utils import idx_to_annotation
 from s2vt.dataset import PreprocessedMSVDDataset
 from s2vt.model import S2VT
 from s2vt.constant import *
 from helper import *
 
-parser = argparse.ArgumentParser(description='S2VT Implementation using PyTorch')
+parser = argparse.ArgumentParser(description='Train S2VT Model')
 parser.add_argument('--annotation-path', help='File path to annotation', required=True)
 parser.add_argument('--train-data-dir', help='Directory path to training annotation', required=True)
 parser.add_argument('--val-data-dir', help='Directory path to training images', required=True)
 parser.add_argument('--ckpt-dir', help='Checkpoint directory, will save for each epoch', default='./checkpoints')
 parser.add_argument('--ckpt-interval', help='How many epoch between checkpoints', default=1, type=int)
 parser.add_argument('--log-dir', help='Log directory', default='./logs')
-parser.add_argument('--timestep', help='Total timestep', default=80, type=int)
+parser.add_argument('--timestep', help='Total timestep', default=50, type=int)
 parser.add_argument('--batch-size', help='Batch size for training', default=8, type=int)
 parser.add_argument('--epoch', help='Total epoch', default=20, type=int)
 parser.add_argument('--learning-rate', help='Learning rate for training', default=1e-4, type=float)
@@ -56,6 +57,7 @@ print('Checkpoint interval:', ckpt_interval)
 print('Log directory:', log_dir)
 print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
+print('Timestep:', timestep)
 print('Epoch:', epoch)
 print('Learning rate:', learning_rate)
 print('Momentum:', momentum)
@@ -83,29 +85,28 @@ model = S2VT(
     vocab_size=train_dataset.vocab_size,
     timestep=timestep,
     lstm_hidden_size=500,
-    drop_out_rate=0.5,
+    drop_out_rate=0.2,
 ).to(DEVICE)
 
 if model_path and not test_overfit:
     print(f'\nLoading pretrained model in {model_path}\n')
     model.load_state_dict(torch.load(model_path))
 
-model.train()
-
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 lr_scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
-loss_func = torch.nn.CrossEntropyLoss(reduction='none')
+loss_func = torch.nn.CrossEntropyLoss()
 
 if test_overfit:
     print('\nTest Overfit with Small Dataset')
     print('To pass this test, you should see a very small loss on the last epoch\n')
-    (X, seq_len), (y, y_mask) = next(iter(train_dataloader))
+    X, (y, y_mask) = next(iter(train_dataloader))
     X = X.to(DEVICE)
     y = y.to(DEVICE)
     y_mask = y_mask.to(DEVICE)
 
+    model.train()
     for epoch_idx in range(epoch):
-        out = model((X, seq_len), y)
+        out = model(X)
 
         batch_loss = torch.zeros(len(out)).to(DEVICE)
         for i in range(len(out)):
@@ -121,9 +122,18 @@ if test_overfit:
 
         print_test_overfit(batch_loss.item(), epoch_idx + 1, epoch)
 
+    model.eval()
+    out = model(X)
+    out = torch.argmax(out, dim=2).to(DEVICE).long()
+
+    res = idx_to_annotation(out[0].tolist(), train_dataset.idx_to_word)
+    grount_truth = idx_to_annotation(y[0].tolist(), train_dataset.idx_to_word)
+    print('Prediction:', format_result(res))
+    print('Ground Truth:', format_result(grount_truth))
+
 else:
+    uid = int(time.time())
     try:
-        uid = int(time.time())
         batch_loss_log_path = os.path.join(log_dir, f'{uid}_batch_loss.csv')
         epoch_loss_log_path = os.path.join(log_dir, f'{uid}_epoch_loss.csv')
         batch_loss_log = create_batch_log_file(batch_loss_log_path)
@@ -138,19 +148,28 @@ else:
             val_batch_losses = torch.zeros(val_dataloader_len).to(DEVICE)
 
             print('Training Phase')
-            for batch_idx, ((X, seq_len), (y, y_mask)) in enumerate(train_dataloader):
+            model.train()
+            for batch_idx, (X, (y, y_mask)) in enumerate(train_dataloader):
                 X = X.to(DEVICE)
                 y = y.to(DEVICE)
                 y_mask = y_mask.to(DEVICE)
-                out = model((X, seq_len), y)
+                out = model(X, y)
 
-                batch_loss = torch.zeros(len(out)).to(DEVICE)
-                for i in range(len(out)):
-                    loss = loss_func(out[i], y[i])
-                    loss *= y_mask[i]
-                    loss = torch.sum(loss).to(DEVICE)
-                    batch_loss[i] = loss
-                batch_loss = torch.mean(batch_loss).to(DEVICE)
+                out = out.view(-1, train_dataset.vocab_size)
+                y = y.view(-1)
+                y_mask = y_mask.view(-1)
+
+                batch_loss = loss_func(out, y)
+                batch_loss = batch_loss * y_mask
+                batch_loss = torch.sum(batch_loss) / torch.sum(y_mask)
+
+                # batch_loss = torch.zeros(len(out)).to(DEVICE)
+                # for i in range(len(out)):
+                #     loss = loss_func(out[i], y[i])
+                #     loss *= y_mask[i]
+                #     loss = torch.sum(loss).to(DEVICE)
+                #     batch_loss[i] = loss
+                # batch_loss = torch.mean(batch_loss).to(DEVICE)
 
                 optimizer.zero_grad()
                 batch_loss.backward()
@@ -162,19 +181,28 @@ else:
                 batch_loss_log.flush()
 
             print('\nValidation Phase')
-            for batch_idx, ((X, seq_len), (y, y_mask)) in enumerate(val_dataloader):
+            model.eval()
+            for batch_idx, (X, (y, y_mask)) in enumerate(val_dataloader):
                 X = X.to(DEVICE)
                 y = y.to(DEVICE)
                 y_mask = y_mask.to(DEVICE)
-                out = model((X, seq_len), y)
+                out = model(X, y)
 
-                batch_loss = torch.zeros(len(out)).to(DEVICE)
-                for i in range(len(out)):
-                    loss = loss_func(out[i], y[i])
-                    loss *= y_mask[i]
-                    loss = torch.sum(loss).to(DEVICE)
-                    batch_loss[i] = loss
-                batch_loss = torch.mean(batch_loss).to(DEVICE)
+                out = out.view(-1, train_dataset.vocab_size)
+                y = y.view(-1)
+                y_mask = y.view(-1)
+
+                batch_loss = loss_func(out, y)
+                batch_loss = batch_loss * y_mask
+                batch_loss = torch.sum(batch_loss) / torch.sum(y_mask)
+
+                # batch_loss = torch.zeros(len(out)).to(DEVICE)
+                # for i in range(len(out)):
+                #     loss = loss_func(out[i], y[i])
+                #     loss *= y_mask[i]
+                #     loss = torch.sum(loss).to(DEVICE)
+                #     batch_loss[i] = loss
+                # batch_loss = torch.mean(batch_loss).to(DEVICE)
 
                 val_batch_losses[batch_idx] = batch_loss.item()
                 print_batch_loss(batch_loss.item(), batch_idx + 1, val_dataloader_len)
@@ -187,20 +215,18 @@ else:
 
             # save model checkpoint
             if ckpt_dir and (epoch_idx % ckpt_interval == 0 or epoch_idx == epoch - 1):
-                timestamp = datetime.strftime(datetime.now(), '%d-%H-%M')
-                filename = f'{timestamp}_{avg_train_loss:.3f}_{avg_val_loss:.3f}.pth'
+                filename = f'{uid}_epoch{epoch_idx:03}_{avg_train_loss:.3f}_{avg_val_loss:.3f}.pth'
                 filepath = os.path.join(ckpt_dir, filename)
                 torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
                 print(f'Model saved to {filepath}')
 
-            lr_scheduler.step()
+            # lr_scheduler.step()
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         if ckpt_dir:
             print('Error occured, saving current progress')
-            timestamp = datetime.strftime(datetime.now(), '%d-%H-%M')
-            filename = f'{timestamp}_backup_error.pth'
+            filename = f'{uid}_backup_error.pth'
             filepath = os.path.join(ckpt_dir, filename)
             torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
             print(f'Model saved to {filepath}')
