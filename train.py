@@ -3,10 +3,9 @@ import argparse
 import torch
 import time
 from datetime import datetime
-from torchvision.transforms import RandomCrop, Normalize
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
-from s2vt.dataset import MSVDDataset
+from s2vt.dataset import PreprocessedMSVDDataset
 from s2vt.model import S2VT
 from s2vt.constant import *
 from helper import *
@@ -64,18 +63,16 @@ print('Gamma:', gamma)
 print('Test overfit:', test_overfit)
 
 # prepare train and validation dataset
-train_dataset = MSVDDataset(
+train_dataset = PreprocessedMSVDDataset(
     train_data_dir,
     annotation_path,
-    transform=[Normalize(VGG_MEAN, VGG_STD), RandomCrop(227)],
     timestep=timestep,
 )
 train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
 
-val_dataset = MSVDDataset(
+val_dataset = PreprocessedMSVDDataset(
     val_data_dir,
     annotation_path,
-    transform=[Normalize(VGG_MEAN, VGG_STD), RandomCrop(227)],
     timestep=timestep,
 )
 val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
@@ -85,16 +82,18 @@ model = S2VT(
     word_to_idx=train_dataset.word_to_idx,
     vocab_size=train_dataset.vocab_size,
     timestep=timestep,
-    drop_out_rate=0.1,
+    lstm_hidden_size=500,
+    drop_out_rate=0.5,
 ).to(DEVICE)
 
 if model_path and not test_overfit:
     print(f'\nLoading pretrained model in {model_path}\n')
     model.load_state_dict(torch.load(model_path))
+
 model.train()
 
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
-lr_scheduler = StepLR(optimizer, step_size=20, gamma=gamma)
+lr_scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
 loss_func = torch.nn.CrossEntropyLoss(reduction='none')
 
 if test_overfit:
@@ -210,6 +209,6 @@ else:
         batch_loss_log.close()
         epoch_loss_log.close()
 
-# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 5 --learning-rate 1e-3
+# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "C:/MSVD_extracted/train" --val-data-dir "C:/MSVD_extracted/validation" --batch-size 8 --epoch 5 --learning-rate 1e-3
 
-# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "D:/ML Dataset/MSVD/YouTubeClips/train" --val-data-dir "D:/ML Dataset/MSVD/YouTubeClips/validation" --batch-size 8 --epoch 10 --learning-rate 1e-3 --momentum 0.9 --gamma 0.5
+# python train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --train-data-dir "C:/MSVD_extracted/train" --val-data-dir "C:/MSVD_extracted/validation" --batch-size 8 --epoch 10 --learning-rate 1e-3 --momentum 0.9 --gamma 0.5
