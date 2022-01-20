@@ -85,7 +85,7 @@ def annotation_to_idx(annotation: List[str], word_to_idx: Dict) -> List[int]:
     return [word_to_idx[x] if x in word_to_idx else -1 for x in annotation]
 
 
-def idx_to_annotation(idxs: List[str], idx_to_word: Dict) -> List[str]:
+def idx_to_annotation(idxs: List[int], idx_to_word: Dict) -> List[str]:
     """Converts integer indexes into annotation
 
     Args:
