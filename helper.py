@@ -1,4 +1,6 @@
 from io import TextIOWrapper
+from typing import List
+from s2vt.constant import EOS_TAG
 
 
 def print_batch_loss(loss_value: float, current_batch: int, total_batch: int):
@@ -21,3 +23,9 @@ def create_epoch_log_file(filepath: str) -> TextIOWrapper:
     file = open(filepath, 'w')
     file.write('Index, Training Loss, Validation Loss\n')
     return file
+
+
+def format_result(result: List) -> str:
+    eos_idx = result.index(EOS_TAG)
+    formatted = result[:eos_idx]
+    return ' '.join(formatted)
