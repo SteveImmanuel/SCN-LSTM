@@ -21,7 +21,6 @@ class S2VT(torch.nn.Module):
         self.vocab_size = vocab_size
         self.lstm_input_size = lstm_input_size
         self.lstm_hidden_size = lstm_hidden_size
-        self.cnn_extractor = self._initialize_vgg()
 
         self.first_lstm = torch.nn.LSTM(
             input_size=lstm_input_size,
@@ -35,7 +34,7 @@ class S2VT(torch.nn.Module):
             batch_first=True,
         )
 
-        self.caption_embedding = torch.nn.Embedding(vocab_size, lstm_hidden_size)
+        self.caption_embedding = torch.nn.Embedding(vocab_size, lstm_input_size)
         self.video_embedding = torch.nn.Linear(cnn_out_size, lstm_input_size)
         self.linear_last = torch.nn.Linear(lstm_hidden_size, vocab_size)
         self.dropout_video_embed = torch.nn.Dropout(drop_out_rate)
@@ -43,38 +42,22 @@ class S2VT(torch.nn.Module):
         self.dropout_lstm_1 = torch.nn.Dropout(drop_out_rate)
         self.dropout_lstm_2 = torch.nn.Dropout(drop_out_rate)
 
-    def _initialize_vgg(self):
-        vgg = models.vgg16(pretrained=True).to(DEVICE)
-        for param in vgg.parameters():
-            param.requires_grad = False
-        # use output from fc7, remove the rest
-        vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:-1])
-        vgg.eval()
-        return vgg
-
     def forward(self, data: Tuple[torch.Tensor, int], caption: torch.Tensor = None) -> torch.Tensor:
         """Forward propagate
 
         Args:
-            x (torch.Tensor): (BATCH_SIZE, timestep, channel, height, width)
+            x (torch.Tensor): (BATCH_SIZE, timestep, cnn_out_size)
             caption (torch.Tensor): (BATCH_SIZE, timestep)
         Returns:
             model inference result 
                 if training, raw unnormalized scores for each class (BATCH_SIZE, timestep, vocab_size)
                 else (BATCH_SIZE, timestep, vocab_size)
         """
-        x, image_seq_len = data
-        batch_size, _, _, _, _ = x.shape
-        extracted_features = []
-        for i in range(self.timestep):
-            temp_extracted = self.cnn_extractor(x[:, i, :, :, :])
-            temp_extracted = self.video_embedding(temp_extracted)
-            extracted_features.append(temp_extracted)
-
-        extracted_features = torch.cat(extracted_features, 0).to(DEVICE)
-        extracted_features = extracted_features.view(batch_size, self.timestep, -1)
+        extracted_features, image_seq_len = data
+        batch_size, _, _ = extracted_features.shape
+        extracted_features = self.video_embedding(extracted_features)
         extracted_features = self.dropout_video_embed(extracted_features)
-        # output from CNN extractor (BATCH_SIZE, timestep, lstm_input_size)
+        # output from video embedding (BATCH_SIZE, timestep, lstm_input_size)
         x, _ = self.first_lstm(extracted_features)
 
         if self.training:
@@ -84,11 +67,11 @@ class S2VT(torch.nn.Module):
             caption = torch.cat((pad_zero, caption), 1).to(DEVICE)
             # dim (BATCH_SIZE, timestep, lstm_hidden_size)
             caption = self.caption_embedding(caption)
-
-            caption = self.dropout_caption_embed(x)
+            caption = self.dropout_caption_embed(caption)
             x = self.dropout_lstm_1(x)
             # concatenate output from first lstm with caption
             x = torch.cat((x, caption), 2).to(DEVICE)
+
             x, _ = self.second_lstm(x)
             x = self.dropout_lstm_2(x)
             x = self.linear_last(x)
