@@ -5,7 +5,7 @@ from typing import Tuple, Dict, List
 from s2vt.constant import *
 
 
-def build_video_dict(annotation_file: str) -> Dict:
+def build_video_dict(annotation_file: str, reverse_key: bool = False) -> Dict:
     """Create video index mapping
 
     Args:
@@ -28,6 +28,10 @@ def build_video_dict(annotation_file: str) -> Dict:
                 video_dict[video_name] = idx
                 idx += 1
             line = annot.readline()
+
+    if reverse_key:
+        return {val: key for key, val in video_dict.items()}
+
     return video_dict
 
 
@@ -166,7 +170,7 @@ def split_train_val_test(root_path: str = '.') -> None:
     subdir = {'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}
 
     for subdir_name, index_range in subdir.items():
-        os.makedirs(subdir_name, exist_ok=True)
+        os.makedirs(os.path.join(root_path, subdir_name), exist_ok=True)
         for i in range(index_range[0], index_range[1] + 1):
             source_path = os.path.join(root_path, videos[i])
             dest_path = os.path.join(root_path, subdir_name, videos[i])
@@ -175,6 +179,6 @@ def split_train_val_test(root_path: str = '.') -> None:
 
 if __name__ == '__main__':
     # video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
-    # split_train_val_test('D:/ML Dataset/MSVD/YouTubeClips')
-    a = build_video_dict('D:/ML Dataset/MSVD/annotations.txt')
-    print(a)
+    split_train_val_test('C:\MSVD_extracted')
+    # a = build_video_dict('D:/ML Dataset/MSVD/annotations.txt')
+    # print(a)
