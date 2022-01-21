@@ -49,44 +49,54 @@ class S2VT(torch.nn.Module):
             caption (torch.Tensor): (BATCH_SIZE, timestep)
         Returns:
             model inference result 
-            raw unnormalized scores for each class (BATCH_SIZE, timestep, vocab_size)
+            raw unnormalized scores for each class (BATCH_SIZE, timestep-1, vocab_size) exclude the BOS tag
         """
         batch_size, _, _ = data.shape
         extracted_features = self.video_embedding(data)
         extracted_features = self.dropout_video_embed(extracted_features)  # (BATCH_SIZE, timestep, video_embed_size)
-        pad_zero = torch.zeros(batch_size, self.timestep, self.video_embed_size).to(DEVICE)
 
+        pad_zero = torch.zeros(batch_size, self.timestep - 1, self.video_embed_size).to(DEVICE)
         lstm1_in = torch.cat((extracted_features, pad_zero), dim=1).to(DEVICE)
-        lstm1_out, _ = self.first_lstm(lstm1_in)  # (BATCH_SIZE, 2*timestep, lstm_hidden_size)
 
-        final_out = torch.zeros(batch_size, self.timestep, self.vocab_size).to(DEVICE)
+        lstm1_out, _ = self.first_lstm(lstm1_in)  # (BATCH_SIZE, 2*timestep - 1, lstm_hidden_size)
 
-        lstm2_state = None
+        if self.training:
+            caption_in = caption[:, :-1]  # right shift by one timestep
+            caption_in = self.caption_embedding(caption_in)
+            caption_in = self.dropout_caption_embed(caption_in)
+            pad_zero = torch.zeros(batch_size, self.timestep, self.caption_embed_size).to(DEVICE)
 
-        for current_timestep in range(2 * self.timestep):
-            lstm2_in = lstm1_out[:, current_timestep:current_timestep + 1, :]  # (BATCH_SIZE, 1, lstm_hidden_size)
+            caption_in = torch.cat((pad_zero, caption_in), dim=1)
+            # (BATCH_SIZE, 2*timestep - 1, lstm_hidden_size+caption_embed_size)
+            lstm2_in = torch.cat((lstm1_out, caption_in), dim=2)
 
-            if current_timestep < self.timestep:
-                caption_out = torch.zeros(batch_size, 1, self.caption_embed_size).long().to(DEVICE)
-            else:
+            final_out, _ = self.second_lstm(lstm2_in)
+            final_out = final_out[:, self.timestep:, :]
+            final_out = self.linear_last(final_out)
+        else:
+            final_out = torch.zeros(batch_size, self.timestep - 1, self.vocab_size).to(DEVICE)
+            pad_zero = torch.zeros(batch_size, self.timestep, self.caption_embed_size).long().to(DEVICE)
+            lstm2_in = lstm1_out[:, :self.timestep, :]
+            lstm2_in = torch.cat((lstm2_in, pad_zero), dim=2)
+            _, lstm2_state = self.second_lstm(lstm2_in)
+
+            # generate one word at a time
+            for current_timestep in range(self.timestep, 2 * self.timestep - 1):
+                lstm2_in = lstm1_out[:, current_timestep:current_timestep + 1, :]  # (BATCH_SIZE, 1, lstm_hidden_size)
+
                 if current_timestep == self.timestep:
                     caption = torch.ones(batch_size, 1).long().to(DEVICE) * self.word_to_idx[BOS_TAG]
 
                 caption_out = self.caption_embedding(caption)
                 caption_out = self.dropout_caption_embed(caption_out)
 
-            # (BATCH_SIZE, 1, lstm_hidden_size+caption_embed_size)
-            lstm2_in = torch.cat((lstm2_in, caption_out), axis=2)
-
-            if current_timestep == 0:
-                lstm2_out, lstm2_state = self.second_lstm(lstm2_in)
-            else:
+                # (BATCH_SIZE, 1, lstm_hidden_size+caption_embed_size)
+                lstm2_in = torch.cat((lstm2_in, caption_out), dim=2)
                 lstm2_out, lstm2_state = self.second_lstm(lstm2_in, lstm2_state)
 
-            raw_caption = self.linear_last(lstm2_out)  # (BATCH_SIZE, 1, vocab_size)
-            caption = torch.argmax(raw_caption, axis=2).to(DEVICE).long()
+                raw_caption = self.linear_last(lstm2_out)  # (BATCH_SIZE, 1, vocab_size)
+                caption = torch.argmax(raw_caption, dim=2).to(DEVICE).long()
 
-            if (current_timestep >= self.timestep):
                 idx = current_timestep - self.timestep
                 final_out[:, idx:idx + 1, :] = raw_caption
 
