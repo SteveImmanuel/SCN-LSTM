@@ -18,7 +18,7 @@ parser.add_argument('--val-data-dir', help='Directory path to training images', 
 parser.add_argument('--ckpt-dir', help='Checkpoint directory, will save for each epoch', default='./checkpoints')
 parser.add_argument('--ckpt-interval', help='How many epoch between checkpoints', default=1, type=int)
 parser.add_argument('--log-dir', help='Log directory', default='./logs')
-parser.add_argument('--timestep', help='Total timestep', default=50, type=int)
+parser.add_argument('--timestep', help='Total timestep', default=80, type=int)
 parser.add_argument('--batch-size', help='Batch size for training', default=8, type=int)
 parser.add_argument('--epoch', help='Total epoch', default=20, type=int)
 parser.add_argument('--learning-rate', help='Learning rate for training', default=1e-4, type=float)
@@ -85,15 +85,16 @@ model = S2VT(
     vocab_size=train_dataset.vocab_size,
     timestep=timestep,
     lstm_hidden_size=500,
-    drop_out_rate=0.2,
+    drop_out_rate=0.3,
 ).to(DEVICE)
 
 if model_path and not test_overfit:
     print(f'\nLoading pretrained model in {model_path}\n')
     model.load_state_dict(torch.load(model_path))
 
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
-lr_scheduler = StepLR(optimizer, step_size=5, gamma=gamma)
+# optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+lr_scheduler = StepLR(optimizer, step_size=10, gamma=gamma)
 loss_func = torch.nn.CrossEntropyLoss()
 
 if test_overfit:
@@ -106,15 +107,15 @@ if test_overfit:
 
     model.train()
     for epoch_idx in range(epoch):
-        out = model(X)
+        out = model(X, y)
 
-        batch_loss = torch.zeros(len(out)).to(DEVICE)
-        for i in range(len(out)):
-            loss = loss_func(out[i], y[i])
-            loss *= y_mask[i]
-            loss = torch.sum(loss).to(DEVICE)
-            batch_loss[i] = loss
-        batch_loss = torch.mean(batch_loss).to(DEVICE)
+        out_flat = out.view(-1, train_dataset.vocab_size)
+        y_flat = y[:, 1:].view(-1)
+        y_mask_flat = y_mask[:, 1:].view(-1)
+
+        batch_loss = loss_func(out_flat, y_flat)
+        batch_loss = batch_loss * y_mask_flat
+        batch_loss = torch.sum(batch_loss) / torch.sum(y_mask_flat)
 
         optimizer.zero_grad()
         batch_loss.backward()
@@ -125,10 +126,9 @@ if test_overfit:
     model.eval()
     out = model(X)
     out = torch.argmax(out, dim=2).to(DEVICE).long()
-
     res = idx_to_annotation(out[0].tolist(), train_dataset.idx_to_word)
-    grount_truth = idx_to_annotation(y[0].tolist(), train_dataset.idx_to_word)
-    print('Prediction:', format_result(res))
+    grount_truth = idx_to_annotation(y[0][1:].tolist(), train_dataset.idx_to_word)
+    print('\nPrediction:', format_result(res))
     print('Ground Truth:', format_result(grount_truth))
 
 else:
@@ -147,7 +147,7 @@ else:
             train_batch_losses = torch.zeros(train_dataloader_len).to(DEVICE)
             val_batch_losses = torch.zeros(val_dataloader_len).to(DEVICE)
 
-            print('Training Phase')
+            print('###Training Phase###')
             model.train()
             for batch_idx, (X, (y, y_mask)) in enumerate(train_dataloader):
                 X = X.to(DEVICE)
@@ -156,20 +156,12 @@ else:
                 out = model(X, y)
 
                 out = out.view(-1, train_dataset.vocab_size)
-                y = y.view(-1)
-                y_mask = y_mask.view(-1)
+                y = y[:, 1:].contiguous().view(-1)
+                y_mask = y_mask[:, 1:].contiguous().view(-1)
 
                 batch_loss = loss_func(out, y)
                 batch_loss = batch_loss * y_mask
                 batch_loss = torch.sum(batch_loss) / torch.sum(y_mask)
-
-                # batch_loss = torch.zeros(len(out)).to(DEVICE)
-                # for i in range(len(out)):
-                #     loss = loss_func(out[i], y[i])
-                #     loss *= y_mask[i]
-                #     loss = torch.sum(loss).to(DEVICE)
-                #     batch_loss[i] = loss
-                # batch_loss = torch.mean(batch_loss).to(DEVICE)
 
                 optimizer.zero_grad()
                 batch_loss.backward()
@@ -180,29 +172,24 @@ else:
                 batch_loss_log.write(f'{epoch_idx*train_dataloader_len+batch_idx},{batch_loss.item()}\n')
                 batch_loss_log.flush()
 
-            print('\nValidation Phase')
+            print('\n###Validation Phase###')
             model.eval()
             for batch_idx, (X, (y, y_mask)) in enumerate(val_dataloader):
                 X = X.to(DEVICE)
                 y = y.to(DEVICE)
                 y_mask = y_mask.to(DEVICE)
-                out = model(X, y)
+                out = model(X)
+
+                temp_y = y[0]
+                temp_out = out[0]
 
                 out = out.view(-1, train_dataset.vocab_size)
-                y = y.view(-1)
-                y_mask = y.view(-1)
+                y = y[:, 1:].contiguous().view(-1)
+                y_mask = y_mask[:, 1:].contiguous().view(-1)
 
                 batch_loss = loss_func(out, y)
                 batch_loss = batch_loss * y_mask
                 batch_loss = torch.sum(batch_loss) / torch.sum(y_mask)
-
-                # batch_loss = torch.zeros(len(out)).to(DEVICE)
-                # for i in range(len(out)):
-                #     loss = loss_func(out[i], y[i])
-                #     loss *= y_mask[i]
-                #     loss = torch.sum(loss).to(DEVICE)
-                #     batch_loss[i] = loss
-                # batch_loss = torch.mean(batch_loss).to(DEVICE)
 
                 val_batch_losses[batch_idx] = batch_loss.item()
                 print_batch_loss(batch_loss.item(), batch_idx + 1, val_dataloader_len)
@@ -212,6 +199,13 @@ else:
             print(f'\nTrain Loss: {avg_train_loss:.5f}, Validation Loss: {avg_val_loss:.5f}')
             epoch_loss_log.write(f'{epoch_idx},{avg_train_loss},{avg_val_loss}\n')
             epoch_loss_log.flush()
+
+            print('###Current Result###')
+            temp_out = torch.argmax(temp_out, dim=1).to(DEVICE).long()
+            temp_out = idx_to_annotation(temp_out.tolist(), val_dataset.idx_to_word)
+            temp_y = idx_to_annotation(temp_y.tolist(), val_dataset.idx_to_word)
+            print('Prediction:', format_result(temp_out))
+            print('Ground Truth:', format_result(temp_y[1:]))
 
             # save model checkpoint
             if ckpt_dir and (epoch_idx % ckpt_interval == 0 or epoch_idx == epoch - 1):
