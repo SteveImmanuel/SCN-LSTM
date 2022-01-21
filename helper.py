@@ -26,6 +26,9 @@ def create_epoch_log_file(filepath: str) -> TextIOWrapper:
 
 
 def format_result(result: List) -> str:
-    eos_idx = result.index(EOS_TAG)
-    formatted = result[:eos_idx]
-    return ' '.join(formatted)
+    try:
+        eos_idx = result.index(EOS_TAG)
+        formatted = result[:eos_idx]
+        return ' '.join(formatted)
+    except:
+        return ' '.join(result)
