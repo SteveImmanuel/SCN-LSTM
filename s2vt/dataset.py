@@ -87,7 +87,6 @@ class PreprocessedMSVDDataset(Dataset):
         # get label
         annot_idx = random.randint(0, len(self.video_caption_mapping[video_name]) - 1)
         annot_raw = self.video_caption_mapping[video_name][annot_idx]  # already contains BOS and EOS
-        annot_raw = annot_raw[1:]  # exclude BOS
         # pad ending annotation with <EOS> until the length matches timestep
         annot_padded = annot_raw + [EOS_TAG] * (self.timestep - len(annot_raw))
 
@@ -100,7 +99,8 @@ class PreprocessedMSVDDataset(Dataset):
 
         annot_mask = torch.cat(
             [
-                torch.ones(len(annot_raw)),  # annotation + EOS tag
+                torch.zeros(1),  # BOS tag
+                torch.ones(len(annot_raw) - 1),  # annotation + EOS tag
                 torch.zeros(self.timestep - len(annot_raw)),
             ],
             0).long()
