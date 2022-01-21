@@ -40,3 +40,39 @@ def extract_features(annotations_file: str, root_path: str, output_dir: str, bat
                     np.save(f, out_numpy[i])
 
     print('\nFeature extraction complete')
+
+
+def parse_features_from_txt(feature_file: str, output_dir: str) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+
+    video_set = set()
+    with open(feature_file, 'r') as f:
+        line = f.readline()
+        while line:
+            tokens = line.split(',')
+            info = tokens[0].split('_')
+            frame_idx = int(info[-1])
+            video_idx = int(info[0][3:])
+            video_name = f'{video_idx-1:04}'
+
+            video_path = os.path.join(output_dir, video_name)
+            if video_name not in video_set:
+                video_set.add(video_name)
+                os.makedirs(video_path, exist_ok=True)
+
+            print(' ' * 80, end='\r')
+            print(f'Parsing {video_name}, frame {frame_idx}', end='\r')
+
+            features = tokens[1:]
+            features = list(map(lambda x: float(x), features))
+            features = np.array(features)
+
+            assert len(features) == 4096
+            npy_path = os.path.join(video_path, f'frame{frame_idx:04d}.npy')
+
+            with open(npy_path, 'wb') as npy_f:
+                np.save(npy_f, features)
+
+            line = f.readline()
+
+    print('\nParse complete')
