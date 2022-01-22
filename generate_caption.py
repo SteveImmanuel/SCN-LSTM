@@ -2,6 +2,7 @@ import traceback
 import argparse
 import torch
 import time
+import json
 from datetime import datetime
 from torch.utils.data import DataLoader
 from s2vt.dataset import PreprocessedMSVDDataset
@@ -61,7 +62,7 @@ try:
     uid = int(time.time())
 
     test_dataloader_len = len(test_dataloader)
-    result = {}
+    result = {'email': 'iam.steve.immanuel@gmail.com', 'predictions': {}}
 
     for batch_idx, (X, (y, y_mask)) in enumerate(test_dataloader):
         print(f'Generating {batch_idx+1}/{test_dataloader_len}', end='\r')
@@ -78,13 +79,13 @@ try:
 
             caption = format_result(caption)
             grount_truth = format_result(grount_truth[1:])
-            result[str(batch_idx * batch_size + i + 1300)] = [caption]
+            result['predictions'][str(batch_idx * batch_size + i + 1300)] = [caption]
 
     with open(out_path, 'w') as output:
-        output.write(str(result))
+        json.dump(result, output)
     print(f'\nGenerated caption to {out_path}')
 
 except Exception:
     traceback.print_exc()
 
-# python generate_caption.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --test-data-dir "C:/MSVD_extracted/out/testing" --batch-size 10 --model-path "./checkpoints/1642771058_epoch099_0.198_0.800.pth" --out-path "./payload.txt"
+# python generate_caption.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --test-data-dir "C:/MSVD_extracted/out/testing" --batch-size 10 --model-path "./checkpoints/1642771058_epoch099_0.198_0.800.pth" --out-path "./payload.json"
