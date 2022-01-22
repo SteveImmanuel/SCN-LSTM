@@ -16,14 +16,12 @@ class RawMSVDDataset(Dataset):
     def __init__(
         self,
         video_path: str,
-        video_dict: Dict,
         transform: List = None,
     ):
         assert os.path.exists(video_path)
         self.video_path = video_path
         self.images = sorted(os.listdir(video_path))
         self.transform = transform
-        self.video_dict = video_dict
 
     def __len__(self):
         return len(self.images)

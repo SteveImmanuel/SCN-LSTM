@@ -26,7 +26,7 @@ def extract_features(annotations_file: str, root_path: str, output_dir: str, bat
         output_video_path = os.path.join(output_dir, f'{video_index:04d}')
         os.makedirs(output_video_path, exist_ok=True)
 
-        raw_dataset = RawMSVDDataset(os.path.join(root_path, video), video_dict, preprocess_funcs)
+        raw_dataset = RawMSVDDataset(os.path.join(root_path, video), preprocess_funcs)
         data_loader = DataLoader(raw_dataset, batch_size=batch_size, shuffle=False)
 
         for batch_idx, (X, _) in enumerate(data_loader):
