@@ -1,6 +1,6 @@
 from io import TextIOWrapper
 from typing import List
-from s2vt.constant import EOS_TAG
+from constant import EOS_TAG
 
 
 def print_batch_loss(loss_value: float, current_batch: int, total_batch: int):

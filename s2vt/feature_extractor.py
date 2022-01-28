@@ -5,7 +5,7 @@ import torchvision.models as models
 from torch.utils.data import DataLoader
 from torchvision.transforms import RandomCrop, Normalize
 from s2vt.dataset import RawMSVDDataset
-from s2vt.constant import *
+from constant import *
 from s2vt.utils import build_video_dict
 
 
@@ -18,7 +18,7 @@ def extract_features(annotations_file: str, root_path: str, output_dir: str, bat
 
     all_videos = os.listdir(root_path)
     video_dict = build_video_dict(annotations_file)
-    preprocess_funcs = [Normalize(VGG_MEAN, VGG_STD), RandomCrop(227)]
+    preprocess_funcs = [Normalize(IMAGE_MEAN, IMAGE_STD), RandomCrop(227)]
 
     for idx, video in enumerate(all_videos):
         print(f'Extracting video {idx+1}/{len(all_videos)}', end='\r')

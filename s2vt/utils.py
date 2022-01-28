@@ -2,7 +2,7 @@ import cv2
 import os
 import shutil
 from typing import Tuple, Dict, List
-from s2vt.constant import *
+from constant import *
 
 
 def build_video_dict(annotation_file: str, reverse_key: bool = False) -> Dict:
