@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import RandomCrop, Normalize
 from s2vt.dataset import RawMSVDDataset
 from constant import *
-from s2vt.utils import build_video_dict
+from utils import build_video_dict
 
 
 def extract_features(annotations_file: str, root_path: str, output_dir: str, batch_size: int = 32) -> None:

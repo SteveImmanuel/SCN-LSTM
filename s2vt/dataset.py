@@ -6,7 +6,7 @@ import torch
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 from typing import List
-from s2vt.utils import *
+from utils import *
 
 
 class RawMSVDDataset(Dataset):

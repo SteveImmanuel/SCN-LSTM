@@ -6,7 +6,7 @@ import traceback
 import math
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
-from s2vt.utils import idx_to_annotation
+from utils import idx_to_annotation
 from s2vt.dataset import PreprocessedMSVDDataset
 from s2vt.model import S2VT
 from constant import *
