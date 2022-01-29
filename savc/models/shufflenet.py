@@ -152,14 +152,17 @@ def get_model(pretrained_path: str, **kwargs):
     checkpoint = torch.load(pretrained_path)
     state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
     model.load_state_dict(state_dict)
+    model.classifier = nn.Identity()
     return model
 
 
 if __name__ == "__main__":
     model = get_model(
         pretrained_path=
-        'C:/Users/Steve/Documents/Git/s2vt-implementation/checkpoints/shufflenetv2/kinetics_shufflenet_2.0x_G3_RGB_16_best.pth',
+        'C:/Users/Steve/Documents/Git/s2vt-implementation/checkpoints/shufflenet/kinetics_shufflenet_2.0x_G3_RGB_16_best.pth',
         num_classes=600,
         groups=3,
         width_mult=2.,
     )
+    from torchsummary import summary
+    summary(model, input_size=(3, 16, 112, 112))
