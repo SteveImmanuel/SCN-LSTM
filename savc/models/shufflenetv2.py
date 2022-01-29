@@ -183,7 +183,7 @@ def get_model(pretrained_path: str, **kwargs):
     """
     Returns the model.
     """
-    model = ShuffleNetV2(**kwargs)
+    model = ShuffleNetV2(num_classes=600, sample_size=112, **kwargs)
     model = model.to(DEVICE)
     checkpoint = torch.load(pretrained_path)
     state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
@@ -196,8 +196,6 @@ if __name__ == "__main__":
     model = get_model(
         pretrained_path=
         'C:/Users/Steve/Documents/Git/s2vt-implementation/checkpoints/shufflenet/kinetics_shufflenetv2_2.0x_RGB_16_best.pth',
-        num_classes=600,
-        sample_size=112,
         width_mult=2.,
     )
     from torchsummary import summary
