@@ -1,3 +1,4 @@
+import math
 import torch
 import time
 import os
@@ -22,7 +23,6 @@ class SDN(torch.nn.Module):
             torch.nn.Linear(512, 512, bias=False),
             torch.nn.BatchNorm1d(512),
             torch.nn.ReLU(),
-            torch.nn.Dropout(dropout_rate),
             torch.nn.Dropout(dropout_rate),
             torch.nn.Linear(512, num_tags),
             torch.nn.Sigmoid(),
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     train_path = 'D:/ML Dataset/MSVD/new_extracted/train'
     val_path = 'D:/ML Dataset/MSVD/new_extracted/validation'
     cnn_2d_model = 'regnetx32'
-    cnn_3d_model = 'shufflenet'
+    cnn_3d_model = 'shufflenetv2'
     batch_size = 20
     epoch = 100
     learning_rate = 5e-3
@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
     # create and prepare model
     model = SDN(
-        cnn_features_size=4440,  # 4568 for shufflenetv2, 4440 for shufflenet
+        cnn_features_size=4568,  # 4568 for shufflenetv2, 4440 for shufflenet
         num_tags=len(train_dataset.tag_dict),
         dropout_rate=0.6,
     ).to(DEVICE)
@@ -103,6 +103,8 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.999))
     lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, min_lr=1e-7, verbose=True)
     loss_func = sdn_loss
+
+    best_val_loss = math.inf
 
     for epoch_idx in range(epoch):
         print(f'\n######### Epoch-{epoch_idx+1} #########')
@@ -152,7 +154,10 @@ if __name__ == '__main__':
         print(f'Train mAP: {avg_train_map:.5f}, Validation mAP: {avg_val_map:.5f}')
         lr_scheduler.step(avg_val_loss)
 
-    filename = f'{uid}_{cnn_2d_model}_{cnn_3d_model}_final.pth'
-    filepath = os.path.join(ckpt_dir, filename)
-    torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
-    print(f'Model saved to {filepath}')
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+
+            filename = f'{uid}_{cnn_2d_model}_{cnn_3d_model}_best.pth'
+            filepath = os.path.join(ckpt_dir, filename)
+            torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
+            print(f'Model saved to {filepath}')
