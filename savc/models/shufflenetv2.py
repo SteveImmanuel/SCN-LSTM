@@ -1,4 +1,4 @@
-# CODE TAKEN FROM https://github.com/okankop/Efficient-3DCNNs
+# CODE TAKEN FROM https://github.com/okankop/Efficient-3DCNNs with minor modifications
 '''ShuffleNetV2 in PyTorch.
 
 See the paper "ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design" for more details.
@@ -11,6 +11,7 @@ from torch.autograd import Variable
 from collections import OrderedDict
 from torch.nn import init
 import math
+from constant import *
 
 
 def conv_bn(inp, oup, stride):
@@ -178,25 +179,23 @@ def get_fine_tuning_parameters(model, ft_portion):
         raise ValueError("Unsupported ft_portion: 'complete' or 'last_layer' expected")
 
 
-def get_model(**kwargs):
+def get_model(pretrained_path: str, **kwargs):
     """
     Returns the model.
     """
     model = ShuffleNetV2(**kwargs)
+    model = model.to(DEVICE)
+    checkpoint = torch.load(pretrained_path)
+    state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
+    model.load_state_dict(state_dict)
     return model
 
 
 if __name__ == "__main__":
-    model = get_model(num_classes=600, sample_size=112, width_mult=2.)
-    model = model.cuda()
-    checkpoint = torch.load(
-        'C:/Users/Steve/Documents/Git/s2vt-implementation/checkpoints/shufflenetv2/kinetics_shufflenetv2_2.0x_RGB_16_best.pth'
+    model = get_model(
+        pretrained_path=
+        'C:/Users/Steve/Documents/Git/s2vt-implementation/checkpoints/shufflenetv2/kinetics_shufflenetv2_2.0x_RGB_16_best.pth',
+        num_classes=600,
+        sample_size=112,
+        width_mult=2.,
     )
-    state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
-    model.load_state_dict(state_dict)
-    # model = nn.DataParallel(model, device_ids=None)
-    # print(model)
-
-    # input_var = Variable(torch.randn(8, 3, 16, 112, 112))
-    # output = model(input_var)
-    # print(output.shape)
