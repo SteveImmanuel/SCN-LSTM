@@ -56,7 +56,7 @@ def sdn_loss(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
     return loss
 
 
-def get_map(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
+def get_accuracy(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
     """Calculate mean average precision
 
     Args:
@@ -110,8 +110,8 @@ if __name__ == '__main__':
         print(f'\n######### Epoch-{epoch_idx+1} #########')
         train_batch_losses = torch.zeros(train_dataloader_len).to(DEVICE)
         val_batch_losses = torch.zeros(val_dataloader_len).to(DEVICE)
-        train_batch_map = torch.zeros(train_dataloader_len).to(DEVICE)
-        val_batch_map = torch.zeros(val_dataloader_len).to(DEVICE)
+        train_batch_accuracy = torch.zeros(train_dataloader_len).to(DEVICE)
+        val_batch_accuracy = torch.zeros(val_dataloader_len).to(DEVICE)
 
         print('###Training Phase###')
         model.train()
@@ -121,14 +121,14 @@ if __name__ == '__main__':
             out = model(X)
 
             batch_loss = loss_func(out, y)
-            map = get_map(out, y)
+            accuracy = get_accuracy(out, y)
 
             optimizer.zero_grad()
             batch_loss.backward()
             optimizer.step()
 
             train_batch_losses[batch_idx] = batch_loss.item()
-            train_batch_map[batch_idx] = map.item()
+            train_batch_accuracy[batch_idx] = accuracy.item()
             print_batch_loss(batch_loss.item(), batch_idx + 1, train_dataloader_len)
 
         print('\n###Validation Phase###')
@@ -139,19 +139,19 @@ if __name__ == '__main__':
             out = model(X)
 
             batch_loss = loss_func(out, y)
-            map = get_map(out, y)
+            accuracy = get_accuracy(out, y)
 
             val_batch_losses[batch_idx] = batch_loss.item()
-            val_batch_map[batch_idx] = map.item()
+            val_batch_accuracy[batch_idx] = accuracy.item()
             print_batch_loss(batch_loss.item(), batch_idx + 1, val_dataloader_len)
 
         avg_train_loss = torch.mean(train_batch_losses).item()
         avg_val_loss = torch.mean(val_batch_losses).item()
-        avg_train_map = torch.mean(train_batch_map).item()
-        avg_val_map = torch.mean(val_batch_map).item()
+        avg_train_accuracy = torch.mean(train_batch_accuracy).item()
+        avg_val_accuracy = torch.mean(val_batch_accuracy).item()
 
         print(f'\nTrain Loss: {avg_train_loss:.5f}, Validation Loss: {avg_val_loss:.5f}')
-        print(f'Train mAP: {avg_train_map:.5f}, Validation mAP: {avg_val_map:.5f}')
+        print(f'Train Accuracy: {avg_train_accuracy:.5f}, Validation Accuracy: {avg_val_accuracy:.5f}')
         lr_scheduler.step(avg_val_loss)
 
         if avg_val_loss < best_val_loss:
