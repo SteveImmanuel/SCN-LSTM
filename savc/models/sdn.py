@@ -56,30 +56,46 @@ def sdn_loss(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
     return loss
 
 
+def get_map(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
+    """Calculate mean average precision
+
+    Args:
+        pred (torch.Tensor): [description] (BATCH_SIZE, num_tags)
+        truth (torch.Tensor): [description] (BATCH_SIZE, num_tags)
+
+    Returns:
+        torch.Tensor: [description]
+    """
+    truth = truth.type(torch.LongTensor)
+    pred = (pred >= 0.5).type(torch.LongTensor)
+    acc = (truth == pred).type(torch.FloatTensor)
+    return torch.mean(acc)
+
+
 if __name__ == '__main__':
     uid = int(time.time())
     annotation_path = 'D:/ML Dataset/MSVD/annotations.txt'
     train_path = 'D:/ML Dataset/MSVD/new_extracted/train'
     val_path = 'D:/ML Dataset/MSVD/new_extracted/validation'
     cnn_2d_model = 'regnetx32'
-    cnn_3d_model = 'shufflenetv2'
+    cnn_3d_model = 'shufflenet'
     batch_size = 20
     epoch = 100
     learning_rate = 5e-3
     ckpt_dir = './checkpoints/sdn'
 
     # prepare train and validation dataset
-    train_dataset = CNNExtractedMSVD(annotation_path, train_path, 512, cnn_2d_model, cnn_3d_model)
+    train_dataset = CNNExtractedMSVD(annotation_path, train_path, 300, cnn_2d_model, cnn_3d_model)
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
     train_dataloader_len = len(train_dataloader)
 
-    val_dataset = CNNExtractedMSVD(annotation_path, val_path, 512, cnn_2d_model, cnn_3d_model)
+    val_dataset = CNNExtractedMSVD(annotation_path, val_path, 300, cnn_2d_model, cnn_3d_model)
     val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
     val_dataloader_len = len(val_dataloader)
 
     # create and prepare model
     model = SDN(
-        cnn_features_size=4568,  # 4568 for shufflenetv2, 4440 for shufflenet
+        cnn_features_size=4440,  # 4568 for shufflenetv2, 4440 for shufflenet
         num_tags=len(train_dataset.tag_dict),
         dropout_rate=0.6,
     ).to(DEVICE)
@@ -92,6 +108,8 @@ if __name__ == '__main__':
         print(f'\n######### Epoch-{epoch_idx+1} #########')
         train_batch_losses = torch.zeros(train_dataloader_len).to(DEVICE)
         val_batch_losses = torch.zeros(val_dataloader_len).to(DEVICE)
+        train_batch_map = torch.zeros(train_dataloader_len).to(DEVICE)
+        val_batch_map = torch.zeros(val_dataloader_len).to(DEVICE)
 
         print('###Training Phase###')
         model.train()
@@ -101,12 +119,14 @@ if __name__ == '__main__':
             out = model(X)
 
             batch_loss = loss_func(out, y)
+            map = get_map(out, y)
 
             optimizer.zero_grad()
             batch_loss.backward()
             optimizer.step()
 
             train_batch_losses[batch_idx] = batch_loss.item()
+            train_batch_map[batch_idx] = map.item()
             print_batch_loss(batch_loss.item(), batch_idx + 1, train_dataloader_len)
 
         print('\n###Validation Phase###')
@@ -117,13 +137,19 @@ if __name__ == '__main__':
             out = model(X)
 
             batch_loss = loss_func(out, y)
+            map = get_map(out, y)
 
             val_batch_losses[batch_idx] = batch_loss.item()
+            val_batch_map[batch_idx] = map.item()
             print_batch_loss(batch_loss.item(), batch_idx + 1, val_dataloader_len)
 
         avg_train_loss = torch.mean(train_batch_losses).item()
         avg_val_loss = torch.mean(val_batch_losses).item()
+        avg_train_map = torch.mean(train_batch_map).item()
+        avg_val_map = torch.mean(val_batch_map).item()
+
         print(f'\nTrain Loss: {avg_train_loss:.5f}, Validation Loss: {avg_val_loss:.5f}')
+        print(f'Train mAP: {avg_train_map:.5f}, Validation mAP: {avg_val_map:.5f}')
         lr_scheduler.step(avg_val_loss)
 
     filename = f'{uid}_{cnn_2d_model}_{cnn_3d_model}_final.pth'
