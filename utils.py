@@ -5,6 +5,54 @@ from typing import Tuple, Dict, List
 from constant import *
 
 
+def count_word_occurence(annotation_file: str) -> Dict:
+    """Count all word occurence in annotation_file to build tags.
+
+    Args:
+        annotation_file (str): [description]
+
+    Returns:
+        Dict: [description]
+    """
+    res = {}
+    with open(annotation_file, 'r') as annot:
+        line = annot.readline()
+        while line:
+            line = line.strip('\n')
+            tokens = line.split(' ')
+            for token in tokens:
+                if token in res:
+                    res[token] += 1
+                else:
+                    res[token] = 1
+            line = annot.readline()
+
+    return dict(sorted(res.items(), key=lambda item: item[1], reverse=True))
+
+
+def build_tags(annotation_file: str, num_tags: int = 750, reverse_key: bool = False) -> Dict:
+    """Build tag dictionary consisting of top num_tags words in terms of occurence
+    in annotation_file
+
+    Args:
+        annotation_file (str): [description]
+        num_tags (int, optional): [description]. Defaults to 750.
+
+    Returns:
+        Dict: [description]
+    """
+    tags = list(count_word_occurence(annotation_file).items())[:num_tags]
+    idx = 0
+    res = {}
+    for tag in tags:
+        res[idx] = tag[0]
+        idx += 1
+
+    if reverse_key:
+        return {val: key for key, val in res.items()}
+    return res
+
+
 def build_video_dict(annotation_file: str, reverse_key: bool = False) -> Dict:
     """Create video index mapping
 
@@ -179,6 +227,7 @@ def split_train_val_test(root_path: str = '.') -> None:
 
 if __name__ == '__main__':
     # video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
-    split_train_val_test('C:\MSVD_extracted')
+    # split_train_val_test('C:\MSVD_extracted')
     # a = build_video_dict('D:/ML Dataset/MSVD/annotations.txt')
-    # print(a)
+    res = build_tags('D:/ML Dataset/MSVD/annotations.txt')
+    print(res)
