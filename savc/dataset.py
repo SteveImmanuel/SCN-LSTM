@@ -74,6 +74,7 @@ class CNNExtractedMSVD(Dataset):
         self,
         annotation_file: str,
         root_path: str,
+        num_tags: int,
         cnn_2d_model: str = 'regnetx32',
         cnn_3d_model: str = 'shufflenetv2',
     ) -> None:
@@ -83,7 +84,7 @@ class CNNExtractedMSVD(Dataset):
         self.root_path = root_path
         self.video_dict = build_video_dict(annotation_file, reverse_key=True)
         self.word_to_idx, self.idx_to_word, self.video_caption_mapping = build_vocab(annotation_file)
-        self.tag_dict = build_tags(annotation_file, reverse_key=True)
+        self.tag_dict = build_tags(annotation_file, num_tags=num_tags, reverse_key=True)
         self.videos = list(set(map(lambda x: x[5:9], os.listdir(self.root_path))))
 
     def __len__(self):

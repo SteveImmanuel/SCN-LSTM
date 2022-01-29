@@ -15,19 +15,16 @@ class SDN(torch.nn.Module):
     def __init__(self, cnn_features_size: int, num_tags: int = 750, dropout_rate: float = 0.3):
         super().__init__()
         self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(cnn_features_size, 2000, bias=False),
-            torch.nn.BatchNorm1d(2000),
+            torch.nn.Linear(cnn_features_size, 512, bias=False),
+            torch.nn.BatchNorm1d(512),
             torch.nn.ReLU(),
             torch.nn.Dropout(dropout_rate),
-            torch.nn.Linear(2000, 1000, bias=False),
-            torch.nn.BatchNorm1d(1000),
+            torch.nn.Linear(512, 512, bias=False),
+            torch.nn.BatchNorm1d(512),
             torch.nn.ReLU(),
             torch.nn.Dropout(dropout_rate),
-            torch.nn.Linear(1000, 750, bias=False),
-            torch.nn.BatchNorm1d(750),
-            torch.nn.ReLU(),
             torch.nn.Dropout(dropout_rate),
-            torch.nn.Linear(750, num_tags),
+            torch.nn.Linear(512, num_tags),
             torch.nn.Sigmoid(),
         )
 
@@ -72,11 +69,11 @@ if __name__ == '__main__':
     ckpt_dir = './checkpoints/sdn'
 
     # prepare train and validation dataset
-    train_dataset = CNNExtractedMSVD(annotation_path, train_path, cnn_2d_model, cnn_3d_model)
+    train_dataset = CNNExtractedMSVD(annotation_path, train_path, 512, cnn_2d_model, cnn_3d_model)
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
     train_dataloader_len = len(train_dataloader)
 
-    val_dataset = CNNExtractedMSVD(annotation_path, val_path, cnn_2d_model, cnn_3d_model)
+    val_dataset = CNNExtractedMSVD(annotation_path, val_path, 512, cnn_2d_model, cnn_3d_model)
     val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
     val_dataloader_len = len(val_dataloader)
 
