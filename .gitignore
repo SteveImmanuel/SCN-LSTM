@@ -163,3 +163,5 @@ logs
 *.txt
 *.json
 temp
+runs
+yolo*
