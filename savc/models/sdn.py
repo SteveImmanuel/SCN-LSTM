@@ -13,7 +13,7 @@ class SDN(torch.nn.Module):
     """
     Semantic Detection Network, to learn tags from cnn features
     """
-    def __init__(self, cnn_features_size: int, num_tags: int = 750, dropout_rate: float = 0.3):
+    def __init__(self, cnn_features_size: int, num_tags: int, dropout_rate: float = 0.3):
         super().__init__()
         self.classifier = torch.nn.Sequential(
             torch.nn.Linear(cnn_features_size, 512, bias=False),
@@ -75,10 +75,10 @@ def get_accuracy(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
 if __name__ == '__main__':
     uid = int(time.time())
     annotation_path = 'D:/ML Dataset/MSVD/annotations.txt'
-    train_path = 'D:/ML Dataset/MSVD/new_extracted/train'
-    val_path = 'D:/ML Dataset/MSVD/new_extracted/validation'
-    cnn_2d_model = 'regnetx32'
-    cnn_3d_model = 'shufflenetv2'
+    train_path = 'D:/ML Dataset/MSVD/new_extracted/train_val'
+    val_path = 'D:/ML Dataset/MSVD/new_extracted/test'
+    cnn_2d_model = 'regnetx32'  # regnetx32 or vgg
+    cnn_3d_model = 'shufflenetv2'  # shufflenet or shufflenetv2
     batch_size = 20
     epoch = 100
     learning_rate = 5e-3
@@ -93,9 +93,12 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
     val_dataloader_len = len(val_dataloader)
 
+    cnn_3d_feature_size = 2048 if cnn_3d_model == 'shufflenetv2' else 1920
+    cnn_2d_feature_size = 4096 if cnn_2d_model == 'vgg' else 2520
+
     # create and prepare model
     model = SDN(
-        cnn_features_size=4568,  # 4568 for shufflenetv2, 4440 for shufflenet
+        cnn_features_size=cnn_3d_feature_size + cnn_2d_feature_size,
         num_tags=len(train_dataset.tag_dict),
         dropout_rate=0.6,
     ).to(DEVICE)
@@ -104,7 +107,7 @@ if __name__ == '__main__':
     lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, min_lr=1e-7, verbose=True)
     loss_func = sdn_loss
 
-    best_val_loss = math.inf
+    best_acc = 0
 
     for epoch_idx in range(epoch):
         print(f'\n######### Epoch-{epoch_idx+1} #########')
@@ -154,8 +157,8 @@ if __name__ == '__main__':
         print(f'Train Accuracy: {avg_train_accuracy:.5f}, Validation Accuracy: {avg_val_accuracy:.5f}')
         lr_scheduler.step(avg_val_loss)
 
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
+        if avg_val_accuracy > best_acc:
+            best_acc = avg_val_accuracy
 
             filename = f'{uid}_{cnn_2d_model}_{cnn_3d_model}_best.pth'
             filepath = os.path.join(ckpt_dir, filename)
