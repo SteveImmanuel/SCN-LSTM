@@ -17,7 +17,8 @@ class SemanticLSTM(torch.nn.Module):
         semantic_size: int,
         cnn_feature_size: int,
         vocab_size: int,
-        max_timestep: int = 80,
+        timestep: int = 80,
+        drop_out_rate: float = 0.3,
     ) -> None:
         super().__init__()
         self.input_size = input_size
@@ -25,12 +26,16 @@ class SemanticLSTM(torch.nn.Module):
         self.embed_size = embed_size
         self.semantic_size = semantic_size
         self.cnn_feature_size = cnn_feature_size
-        self.max_timestep = max_timestep
+        self.vocab_size = vocab_size
+        self.timestep = timestep
 
         self._init_weights()
-        self.word_embed = torch.nn.Embedding(vocab_size, embed_size)
+        self.caption_embedding = torch.nn.Embedding(vocab_size, embed_size)
         self.sigmoid = torch.nn.Sigmoid()
         self.tanh = torch.nn.Tanh()
+        self.linear_last = torch.nn.Linear(hidden_size, vocab_size)
+        self.dropout_caption_embed = torch.nn.Dropout(drop_out_rate)
+        self.dropout_cnn = torch.nn.Dropout(drop_out_rate)
 
     def _get_weight(self, size: Tuple):
         weight = torch.empty(size)
@@ -194,26 +199,29 @@ class SemanticLSTM(torch.nn.Module):
         """Forward propagate
 
         Args:
-            captions (torch.Tensor): [description] (BATCH_SIZE, caption_len)
-            cnn_features (torch.Tensor): [description] (BATCH_SIZE, cnn_features_size)
-            semantics (torch.Tensor): [description] (BATCH_SIZE, semantic_size)
+            captions (torch.Tensor):  (BATCH_SIZE, caption_len)
+            cnn_features (torch.Tensor):  (BATCH_SIZE, cnn_features_size)
+            semantics (torch.Tensor):  (BATCH_SIZE, semantic_size)
 
         Returns:
-            torch.Tensor: [description] (BATCH_SIZE, timestep, vocab_size)
+            torch.Tensor:  (BATCH_SIZE, timestep-1, vocab_size)
         """
         batch_size, _ = captions.shape
         last_ht = torch.zeros(batch_size, self.hidden_size).to(DEVICE)
         last_ct = torch.zeros(batch_size, self.hidden_size).to(DEVICE)
 
+        cnn_features = self.dropout_cnn(cnn_features)
         caption = captions[:, 0]
 
-        for _ in range(self.max_timestep):
-            word_embedded = self.word_embed(caption)  # (BATCH_SIZE, embed_size)
+        result = torch.empty(batch_size, self.timestep - 1, self.vocab_size).to(DEVICE)
+        for timestep_idx in range(self.timestep - 1):
+            caption_embed = self.caption_embedding(caption)  # (BATCH_SIZE, embed_size)
+            caption_embed = self.dropout_caption_embed(caption_embed)
 
-            xi = self.calculate_semantic_related_features(semantics, word_embedded, 'i', 'x')
-            xf = self.calculate_semantic_related_features(semantics, word_embedded, 'f', 'x')
-            xo = self.calculate_semantic_related_features(semantics, word_embedded, 'o', 'x')
-            xg = self.calculate_semantic_related_features(semantics, word_embedded, 'g', 'x')
+            xi = self.calculate_semantic_related_features(semantics, caption_embed, 'i', 'x')
+            xf = self.calculate_semantic_related_features(semantics, caption_embed, 'f', 'x')
+            xo = self.calculate_semantic_related_features(semantics, caption_embed, 'o', 'x')
+            xg = self.calculate_semantic_related_features(semantics, caption_embed, 'g', 'x')
 
             vi = self.calculate_semantic_related_features(semantics, cnn_features, 'i', 'v')
             vf = self.calculate_semantic_related_features(semantics, cnn_features, 'f', 'v')
@@ -233,6 +241,12 @@ class SemanticLSTM(torch.nn.Module):
             last_ct = f_gate * last_ct + i_gate * g_gate
             last_ht = o_gate * self.tanh(last_ct)
 
+            out = self.linear_last(last_ht)  # (BATCH_SIZE, vocab_size)
+            result[:, timestep_idx, :] = out
+            caption = torch.argmax(out, dim=1)
+
+        return result
+
 
 if __name__ == '__main__':
     model = SemanticLSTM(
@@ -251,4 +265,4 @@ if __name__ == '__main__':
     captions = torch.ones((batch_size, 80)).long().cuda()
 
     res = model(captions, cnn_features, semantics)
-    print(res)
+    print(res.shape)
