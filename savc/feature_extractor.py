@@ -4,9 +4,10 @@ import numpy as np
 import torchvision.models as models
 from torch.utils.data import DataLoader
 from torchvision.transforms import RandomCrop, Normalize, Resize
-from savc.dataset import RawMSVDDataset, SequenceImageMSVDDataset
+from savc.dataset import CNNExtractedMSVD, RawMSVDDataset, SequenceImageMSVDDataset
 from savc.models.shufflenet import get_model as ShuffleNet
 from savc.models.shufflenetv2 import get_model as ShuffleNetV2
+from savc.models.sdn import SDN
 from constant import *
 from utils import build_video_dict
 
@@ -116,6 +117,50 @@ def combine_cnn_features(input_dir: str, output_dir: str, cnn_2d_model: str, cnn
     print('\nCombine features complete')
 
 
+def extract_semantics(
+    model_path: str,
+    annotation_path: str,
+    data_path: str,
+    output_path: str,
+    batch_size: int = 20,
+    start_idx: int = 0,
+):
+    checkpoint = torch.load(model_path)
+    cnn_2d_model = checkpoint['cnn_2d_model']
+    cnn_3d_model = checkpoint['cnn_3d_model']
+
+    dataset = CNNExtractedMSVD(annotation_path, data_path, 300, cnn_2d_model, cnn_3d_model)
+    dataloader = DataLoader(dataset, shuffle=True, batch_size=batch_size)
+    dataloader_len = len(dataloader)
+
+    model = SDN(
+        cnn_features_size=CNN_3D_FEATURES_SIZE[cnn_3d_model] + CNN_2D_FEATURES_SIZE[cnn_2d_model],
+        num_tags=len(dataset.tag_dict),
+        dropout_rate=0.6,
+    ).to(DEVICE)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
+
+    output_dir = os.path.join(output_path, f'{cnn_2d_model}_{cnn_3d_model}')
+    os.makedirs(output_dir, exist_ok=True)
+
+    for batch_idx, (X, _) in enumerate(dataloader):
+        print(f'Extracting semantics {batch_idx+1}/{dataloader_len}', end='\r')
+
+        X = X.to(DEVICE)
+        out = model(X)
+        out = (out >= 0.5).type(torch.FloatTensor)
+
+        out_numpy = out.cpu().detach().numpy()
+
+        for i in range(out_numpy.shape[0]):
+            npy_path = os.path.join(output_dir, f'video{(batch_idx*batch_size)+i+start_idx:04d}_semantic_features.npy')
+            with open(npy_path, 'wb') as f:
+                np.save(f, out_numpy[i])
+
+    print('\nExtract semantic features complete')
+
+
 if __name__ == '__main__':
     # extract_features_2d_cnn(
     #     'D:/ML Dataset/MSVD/annotations.txt',
@@ -129,12 +174,30 @@ if __name__ == '__main__':
     #     'D:/ML Dataset/MSVD/new_extracted',
     #     model_name='shufflenet',
     # )
-    cnn2d_model = 'regnetx32'
-    cnn3d_model = 'shufflenetv2'
+    # combine_cnn_features(
+    #     'D:/ML Dataset/MSVD/new_extracted/train',
+    #     f'D:/ML Dataset/MSVD/combined_feature/{cnn2d_model}_{cnn3d_model}',
+    #     cnn2d_model,
+    #     cnn3d_model,
+    # )
 
-    combine_cnn_features(
-        'D:/ML Dataset/MSVD/new_extracted/train',
-        f'D:/ML Dataset/MSVD/combined_feature/{cnn2d_model}_{cnn3d_model}',
-        cnn2d_model,
-        cnn3d_model,
-    )
+    cnn2d_model = ['regnetx32', 'vgg']
+    cnn3d_model = ['shufflenetv2', 'shufflenet']
+    data_type = ['train', 'test', 'validation']
+
+    for model_2d in cnn2d_model:
+        for model_3d in cnn3d_model:
+            for type in data_type:
+                if type == 'train':
+                    start_idx = 0
+                elif type == 'validation':
+                    start_idx = 1200
+                else:
+                    start_idx = 1300
+                extract_semantics(
+                    f'./checkpoints/sdn/{model_2d}_{model_3d}_best.pth',
+                    'D:/ML Dataset/MSVD/annotations.txt',
+                    f'D:/ML Dataset/MSVD/new_extracted/{type}',
+                    'D:/ML Dataset/MSVD/features/semantics',
+                    start_idx=start_idx,
+                )
