@@ -96,40 +96,24 @@ def extract_features_3d_cnn(
     print('\nFeature extraction complete')
 
 
-def parse_features_from_txt(feature_file: str, output_dir: str) -> None:
+def combine_cnn_features(input_dir: str, output_dir: str, cnn_2d_model: str, cnn_3d_model: str):
     os.makedirs(output_dir, exist_ok=True)
+    videos = list(set(map(lambda x: x[5:9], os.listdir(input_dir))))
 
-    video_set = set()
-    with open(feature_file, 'r') as f:
-        line = f.readline()
-        while line:
-            tokens = line.split(',')
-            info = tokens[0].split('_')
-            frame_idx = int(info[-1])
-            video_idx = int(info[0][3:])
-            video_name = f'{video_idx-1:04}'
+    for idx, video_idx in enumerate(videos):
+        print(f'Combining {idx+1}/{len(videos)}', end='\r')
 
-            video_path = os.path.join(output_dir, video_name)
-            if video_name not in video_set:
-                video_set.add(video_name)
-                os.makedirs(video_path, exist_ok=True)
+        cnn2d_npy_path = os.path.join(input_dir, f'video{video_idx}_cnn_2d_{cnn_2d_model}.npy')
+        cnn3d_npy_path = os.path.join(input_dir, f'video{video_idx}_cnn_3d_{cnn_3d_model}.npy')
+        cnn2d_features = np.load(cnn2d_npy_path)
+        cnn3d_features = np.load(cnn3d_npy_path)
+        features = np.concatenate((cnn3d_features, cnn2d_features), axis=0)
 
-            print(' ' * 80, end='\r')
-            print(f'Parsing {video_name}, frame {frame_idx}', end='\r')
+        out_path = os.path.join(output_dir, f'video{video_idx}_cnn_features.npy')
+        with open(out_path, 'wb') as f:
+            np.save(f, features)
 
-            features = tokens[1:]
-            features = list(map(lambda x: float(x), features))
-            features = np.array(features)
-
-            assert len(features) == 4096
-            npy_path = os.path.join(video_path, f'frame{frame_idx:04d}.npy')
-
-            with open(npy_path, 'wb') as npy_f:
-                np.save(npy_f, features)
-
-            line = f.readline()
-
-    print('\nParse complete')
+    print('\nCombine features complete')
 
 
 if __name__ == '__main__':
@@ -139,9 +123,18 @@ if __name__ == '__main__':
     #     'D:/ML Dataset/MSVD/new_extracted',
     #     batch_size=8,
     # )
-    extract_features_3d_cnn(
-        'D:/ML Dataset/MSVD/annotations.txt',
-        'D:/ML Dataset/MSVD/YouTubeClips',
-        'D:/ML Dataset/MSVD/new_extracted',
-        model_name='shufflenet',
+    # extract_features_3d_cnn(
+    #     'D:/ML Dataset/MSVD/annotations.txt',
+    #     'D:/ML Dataset/MSVD/YouTubeClips',
+    #     'D:/ML Dataset/MSVD/new_extracted',
+    #     model_name='shufflenet',
+    # )
+    cnn2d_model = 'regnetx32'
+    cnn3d_model = 'shufflenetv2'
+
+    combine_cnn_features(
+        'D:/ML Dataset/MSVD/new_extracted/train',
+        f'D:/ML Dataset/MSVD/combined_feature/{cnn2d_model}_{cnn3d_model}',
+        cnn2d_model,
+        cnn3d_model,
     )
