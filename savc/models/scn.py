@@ -14,7 +14,7 @@ class SemanticLSTM(torch.nn.Module):
         input_size: int,
         hidden_size: int,
         embed_size: int,
-        label_size: int,
+        semantic_size: int,
         cnn_feature_size: int,
         vocab_size: int,
         max_timestep: int = 80,
@@ -23,7 +23,7 @@ class SemanticLSTM(torch.nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.embed_size = embed_size
-        self.label_size = label_size
+        self.semantic_size = semantic_size
         self.cnn_feature_size = cnn_feature_size
         self.max_timestep = max_timestep
 
@@ -46,10 +46,10 @@ class SemanticLSTM(torch.nn.Module):
         self.wa_o = self._get_weight((self.embed_size, self.input_size))
         self.wa_g = self._get_weight((self.embed_size, self.input_size))
 
-        self.wb_i = self._get_weight((self.label_size, self.input_size))
-        self.wb_f = self._get_weight((self.label_size, self.input_size))
-        self.wb_o = self._get_weight((self.label_size, self.input_size))
-        self.wb_g = self._get_weight((self.label_size, self.input_size))
+        self.wb_i = self._get_weight((self.semantic_size, self.input_size))
+        self.wb_f = self._get_weight((self.semantic_size, self.input_size))
+        self.wb_o = self._get_weight((self.semantic_size, self.input_size))
+        self.wb_g = self._get_weight((self.semantic_size, self.input_size))
 
         self.wc_i = self._get_weight((self.input_size, self.hidden_size))
         self.wc_f = self._get_weight((self.input_size, self.hidden_size))
@@ -61,10 +61,10 @@ class SemanticLSTM(torch.nn.Module):
         self.ua_o = self._get_weight((self.hidden_size, self.input_size))
         self.ua_g = self._get_weight((self.hidden_size, self.input_size))
 
-        self.ub_i = self._get_weight((self.label_size, self.input_size))
-        self.ub_f = self._get_weight((self.label_size, self.input_size))
-        self.ub_o = self._get_weight((self.label_size, self.input_size))
-        self.ub_g = self._get_weight((self.label_size, self.input_size))
+        self.ub_i = self._get_weight((self.semantic_size, self.input_size))
+        self.ub_f = self._get_weight((self.semantic_size, self.input_size))
+        self.ub_o = self._get_weight((self.semantic_size, self.input_size))
+        self.ub_g = self._get_weight((self.semantic_size, self.input_size))
 
         self.uc_i = self._get_weight((self.input_size, self.hidden_size))
         self.uc_f = self._get_weight((self.input_size, self.hidden_size))
@@ -76,10 +76,10 @@ class SemanticLSTM(torch.nn.Module):
         self.ca_o = self._get_weight((self.cnn_feature_size, self.input_size))
         self.ca_g = self._get_weight((self.cnn_feature_size, self.input_size))
 
-        self.cb_i = self._get_weight((self.label_size, self.input_size))
-        self.cb_f = self._get_weight((self.label_size, self.input_size))
-        self.cb_o = self._get_weight((self.label_size, self.input_size))
-        self.cb_g = self._get_weight((self.label_size, self.input_size))
+        self.cb_i = self._get_weight((self.semantic_size, self.input_size))
+        self.cb_f = self._get_weight((self.semantic_size, self.input_size))
+        self.cb_o = self._get_weight((self.semantic_size, self.input_size))
+        self.cb_g = self._get_weight((self.semantic_size, self.input_size))
 
         self.cc_i = self._get_weight((self.input_size, self.hidden_size))
         self.cc_f = self._get_weight((self.input_size, self.hidden_size))
@@ -172,7 +172,7 @@ class SemanticLSTM(torch.nn.Module):
         """Calculate features with semantics incorporated based on the paper
 
         Args:
-            semantic (torch.Tensor): (BATCH_SIZE, label_size)
+            semantic (torch.Tensor): (BATCH_SIZE, semantic_size)
             vector (torch.Tensor): (BATCH_SIZE, cnn_feature_size OR hidden_size OR embed_size)
             gate_type (torch.Tensor): [i, f, o, g]
             vector_type (torch.Tensor): [x, h, v]
@@ -196,7 +196,7 @@ class SemanticLSTM(torch.nn.Module):
         Args:
             captions (torch.Tensor): [description] (BATCH_SIZE, caption_len)
             cnn_features (torch.Tensor): [description] (BATCH_SIZE, cnn_features_size)
-            semantics (torch.Tensor): [description] (BATCH_SIZE, label_size)
+            semantics (torch.Tensor): [description] (BATCH_SIZE, semantic_size)
 
         Returns:
             torch.Tensor: [description] (BATCH_SIZE, timestep, vocab_size)
@@ -240,7 +240,7 @@ if __name__ == '__main__':
         vocab_size=15000,
         hidden_size=500,
         embed_size=500,
-        label_size=300,
+        semantic_size=300,
         cnn_feature_size=4000,
     )
     model = model.cuda()
