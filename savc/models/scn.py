@@ -11,12 +11,12 @@ class SemanticLSTM(torch.nn.Module):
     """
     def __init__(
         self,
-        input_size: int,
-        hidden_size: int,
-        embed_size: int,
-        semantic_size: int,
         cnn_feature_size: int,
         vocab_size: int,
+        input_size: int = 512,
+        hidden_size: int = 512,
+        embed_size: int = 512,
+        semantic_size: int = 300,
         timestep: int = 80,
         drop_out_rate: float = 0.3,
     ) -> None:
@@ -38,12 +38,12 @@ class SemanticLSTM(torch.nn.Module):
         self.dropout_cnn = torch.nn.Dropout(drop_out_rate)
 
     def _get_weight(self, size: Tuple):
-        weight = torch.empty(size)
+        weight = torch.empty(size, requires_grad=True)
         weight = torch.nn.init.xavier_normal_(weight)
-        return Parameter(weight)
+        return Parameter(weight, requires_grad=True)
 
     def _get_bias(self, size: Tuple):
-        return Parameter(torch.zeros(size))
+        return Parameter(torch.zeros(size, requires_grad=True), requires_grad=True)
 
     def _init_weights(self):
         self.wa_i = self._get_weight((self.embed_size, self.input_size))
@@ -199,7 +199,7 @@ class SemanticLSTM(torch.nn.Module):
         """Forward propagate
 
         Args:
-            captions (torch.Tensor):  (BATCH_SIZE, caption_len)
+            captions (torch.Tensor):  (BATCH_SIZE, timestep)
             cnn_features (torch.Tensor):  (BATCH_SIZE, cnn_features_size)
             semantics (torch.Tensor):  (BATCH_SIZE, semantic_size)
 
@@ -243,7 +243,8 @@ class SemanticLSTM(torch.nn.Module):
 
             out = self.linear_last(last_ht)  # (BATCH_SIZE, vocab_size)
             result[:, timestep_idx, :] = out
-            caption = torch.argmax(out, dim=1)
+            caption = torch.argmax(out, dim=1).to(DEVICE).long()
+            caption = captions[:, timestep_idx + 1]
 
         return result
 
