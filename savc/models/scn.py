@@ -1,6 +1,7 @@
 import torch
 from torch.nn.parameter import Parameter
 from typing import Tuple
+from constant import DEVICE
 
 
 class SemanticLSTM(torch.nn.Module):
@@ -28,6 +29,8 @@ class SemanticLSTM(torch.nn.Module):
 
         self._init_weights()
         self.word_embed = torch.nn.Embedding(vocab_size, embed_size)
+        self.sigmoid = torch.nn.Sigmoid()
+        self.tanh = torch.nn.Tanh()
 
     def _get_weight(self, size: Tuple):
         weight = torch.empty(size)
@@ -181,10 +184,10 @@ class SemanticLSTM(torch.nn.Module):
         b_weight = self.weight_dict[gate_type][vector_type]['b']
         c_weight = self.weight_dict[gate_type][vector_type]['c']
 
-        a_mul = torch.einsum('bij,bi->bj', a_weight, vector)
-        b_mul = torch.einsum('bij,bi->bj', b_weight, semantic)
+        a_mul = torch.einsum('ij,bi->bj', a_weight, vector)
+        b_mul = torch.einsum('ij,bi->bj', b_weight, semantic)
         hadamard = a_mul * b_mul
-        c_mul = torch.einsum('bij,bi->bj', c_weight, hadamard)
+        c_mul = torch.einsum('ij,bi->bj', c_weight, hadamard)
         return c_mul
 
     def forward(self, captions: torch.Tensor, cnn_features: torch.Tensor, semantics: torch.Tensor) -> torch.Tensor:
@@ -196,11 +199,11 @@ class SemanticLSTM(torch.nn.Module):
             semantics (torch.Tensor): [description] (BATCH_SIZE, label_size)
 
         Returns:
-            torch.Tensor: [description]
+            torch.Tensor: [description] (BATCH_SIZE, timestep, vocab_size)
         """
         batch_size, _ = captions.shape
-        last_ht = torch.zeros(batch_size, self.hidden_size)
-        last_ct = torch.zeros(batch_size, self.hidden_size)
+        last_ht = torch.zeros(batch_size, self.hidden_size).to(DEVICE)
+        last_ct = torch.zeros(batch_size, self.hidden_size).to(DEVICE)
 
         caption = captions[:, 0]
 
@@ -222,16 +225,30 @@ class SemanticLSTM(torch.nn.Module):
             ho = self.calculate_semantic_related_features(semantics, last_ht, 'o', 'h')
             hg = self.calculate_semantic_related_features(semantics, last_ht, 'g', 'h')
 
-            i_gate = torch.nn.Sigmoid(xi + hi + vi + self.bias_i)
-            f_gate = torch.nn.Sigmoid(xf + hf + vf + self.bias_f)
-            o_gate = torch.nn.Sigmoid(xo + ho + vo + self.bias_o)
-            g_gate = torch.nn.Tanh(xg + hg + vg + self.bias_g)
+            i_gate = self.sigmoid(xi + hi + vi + self.bias_i)
+            f_gate = self.sigmoid(xf + hf + vf + self.bias_f)
+            o_gate = self.sigmoid(xo + ho + vo + self.bias_o)
+            g_gate = self.tanh(xg + hg + vg + self.bias_g)
 
             last_ct = f_gate * last_ct + i_gate * g_gate
-            last_ht = o_gate * torch.nn.Tanh(last_ct)
+            last_ht = o_gate * self.tanh(last_ct)
 
 
 if __name__ == '__main__':
-    model = SemanticLSTM(input_size=1000, hidden_size=500, embed_size=500, label_size=300, cnn_feature_size=4000)
+    model = SemanticLSTM(
+        input_size=1000,
+        vocab_size=15000,
+        hidden_size=500,
+        embed_size=500,
+        label_size=300,
+        cnn_feature_size=4000,
+    )
     model = model.cuda()
-    print(model)
+
+    batch_size = 8
+    semantics = torch.randn((batch_size, 300)).cuda()
+    cnn_features = torch.randn((batch_size, 4000)).cuda()
+    captions = torch.ones((batch_size, 80)).long().cuda()
+
+    res = model(captions, cnn_features, semantics)
+    print(res)
