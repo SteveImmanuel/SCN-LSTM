@@ -77,7 +77,7 @@ if __name__ == '__main__':
     annotation_path = 'D:/ML Dataset/MSVD/annotations.txt'
     train_path = 'D:/ML Dataset/MSVD/new_extracted/train_val'
     val_path = 'D:/ML Dataset/MSVD/new_extracted/test'
-    cnn_2d_model = 'regnetx32'  # regnetx32 or vgg
+    cnn_2d_model = 'vgg'  # regnetx32 or vgg
     cnn_3d_model = 'shufflenetv2'  # shufflenet or shufflenetv2
     batch_size = 20
     epoch = 100
@@ -93,12 +93,9 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
     val_dataloader_len = len(val_dataloader)
 
-    cnn_3d_feature_size = 2048 if cnn_3d_model == 'shufflenetv2' else 1920
-    cnn_2d_feature_size = 4096 if cnn_2d_model == 'vgg' else 2520
-
     # create and prepare model
     model = SDN(
-        cnn_features_size=cnn_3d_feature_size + cnn_2d_feature_size,
+        cnn_features_size=CNN_3D_FEATURES_SIZE[cnn_3d_model] + CNN_2D_FEATURES_SIZE[cnn_2d_model],
         num_tags=len(train_dataset.tag_dict),
         dropout_rate=0.6,
     ).to(DEVICE)
@@ -162,5 +159,11 @@ if __name__ == '__main__':
 
             filename = f'{uid}_{cnn_2d_model}_{cnn_3d_model}_best.pth'
             filepath = os.path.join(ckpt_dir, filename)
-            torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
+            checkpoint = {
+                'cnn_2d_model': cnn_2d_model,
+                'cnn_3d_model': cnn_3d_model,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }
+            torch.save(checkpoint, os.path.join(ckpt_dir, filename))
             print(f'Model saved to {filepath}')
