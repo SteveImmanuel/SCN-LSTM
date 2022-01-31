@@ -1,5 +1,6 @@
 import os
 import math
+import random
 import torch
 import cv2
 import numpy as np
@@ -66,7 +67,7 @@ class SequenceImageMSVDDataset(Dataset):
 
         tensor_frames = torch.cat(frames, dim=1)
 
-        return (tensor_frames, torch.empty(0))  # 16, C, H, W
+        return (tensor_frames, torch.empty(0))  # C, 16, H, W
 
 
 class CNNExtractedMSVD(Dataset):
@@ -111,3 +112,71 @@ class CNNExtractedMSVD(Dataset):
                 label[self.tag_dict[word]] = 1.0
 
         return (cnn_features, label)
+
+
+class CompiledMSVD(Dataset):
+    """
+    Consist of extracted cnn features, extracted semantic features,
+    and captions
+    """
+    def __init__(
+        self,
+        annotation_file: str,
+        cnn_features_path: str,
+        semantic_features_path: str,
+        timestep: int = 80,
+    ) -> None:
+        super().__init__()
+        assert os.path.exists(cnn_features_path)
+        assert os.path.exists(semantic_features_path)
+        assert os.path.exists(annotation_file)
+
+        self.cnn_features_path = cnn_features_path
+        self.semantic_features_path = semantic_features_path
+        self.word_to_idx, self.idx_to_word, self.video_caption_mapping = build_vocab(annotation_file)
+        self.video_dict = build_video_dict(annotation_file, reverse_key=True)
+        self.all_cnn_features = sorted(os.listdir(cnn_features_path))
+        self.all_semantic_features = sorted(os.listdir(semantic_features_path))
+        self.videos = list(map(lambda x: x[5:9], self.all_cnn_features))
+        self.vocab_size = len(self.word_to_idx)
+        self.timestep = timestep
+
+    def __len__(self):
+        return len(self.videos)
+
+    def __getitem__(self, index):
+        video_idx = int(self.videos[index])
+        video_name = self.video_dict[video_idx]
+
+        cnn_features_path = os.path.join(self.cnn_features_path, self.all_cnn_features[video_idx])
+        cnn_features = np.load(cnn_features_path)
+        cnn_features = torch.FloatTensor(cnn_features)
+
+        semantic_features_path = os.path.join(self.semantic_features_path, self.all_semantic_features[video_idx])
+        semantic_features = np.load(semantic_features_path)
+        semantic_features = torch.FloatTensor(semantic_features)
+
+        # get label
+        annot_idx = random.randint(0, len(self.video_caption_mapping[video_name]) - 1)
+        annot_raw = self.video_caption_mapping[video_name][annot_idx]  # already contains BOS and EOS
+        # pad ending annotation with <EOS> until the length matches timestep
+        annot_padded = annot_raw + [EOS_TAG] * (self.timestep - len(annot_raw))
+
+        annotation = annotation_to_idx(annot_padded, self.word_to_idx)
+        label_annotation = torch.LongTensor(annotation)
+        # output dim = (timestep)
+
+        assert self.timestep - len(
+            annot_raw) >= 0, f'Annotation too long for video {video_name}, len={len(annot_raw)} words'
+
+        annot_mask = torch.cat(
+            [
+                torch.zeros(1),  # BOS tag
+                torch.ones(len(annot_raw) - 1),  # annotation + EOS tag
+                torch.zeros(self.timestep - len(annot_raw)),
+            ],
+            0,
+        ).long()
+        # weighted_mask = annot_mask * self.timestep_weight
+
+        return (cnn_features, semantic_features, label_annotation, annot_mask)
