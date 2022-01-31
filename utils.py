@@ -215,19 +215,24 @@ def split_train_val_test(root_path: str = '.') -> None:
         root_path (str, optional): [description]. Defaults to '.'.
     """
     videos = sorted(os.listdir(root_path))
-    subdir = {'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}
+    subdir = {'train_val': [0, 1299], 'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}
 
     for subdir_name, index_range in subdir.items():
         os.makedirs(os.path.join(root_path, subdir_name), exist_ok=True)
         for i in range(index_range[0], index_range[1] + 1):
             source_path = os.path.join(root_path, videos[i])
             dest_path = os.path.join(root_path, subdir_name, videos[i])
-            shutil.move(source_path, dest_path)
+
+            if subdir_name == 'train_val':
+                shutil.copy(source_path, dest_path)
+            else:
+                shutil.move(source_path, dest_path)
 
 
 if __name__ == '__main__':
-    # video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
-    # split_train_val_test('C:\MSVD_extracted')
-    # a = build_video_dict('D:/ML Dataset/MSVD/annotations.txt')
-    res = build_tags('D:/ML Dataset/MSVD/annotations.txt')
-    print(res)
+    cnn2d_model = ['regnetx32', 'vgg']
+    cnn3d_model = ['shufflenetv2', 'shufflenet']
+
+    for model_2d in cnn2d_model:
+        for model_3d in cnn3d_model:
+            split_train_val_test(f'D:/ML Dataset/MSVD/features/semantics/{model_2d}_{model_3d}')
