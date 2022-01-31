@@ -9,10 +9,10 @@ def count_word_occurence(annotation_file: str) -> Dict:
     """Count all word occurence in annotation_file to build tags.
 
     Args:
-        annotation_file (str): [description]
+        annotation_file (str): 
 
     Returns:
-        Dict: [description]
+        Dict: 
     """
     res = {}
     with open(annotation_file, 'r') as annot:
@@ -35,11 +35,11 @@ def build_tags(annotation_file: str, num_tags: int = 750, reverse_key: bool = Fa
     in annotation_file
 
     Args:
-        annotation_file (str): [description]
-        num_tags (int, optional): [description]. Defaults to 750.
+        annotation_file (str): 
+        num_tags (int, optional): . Defaults to 750.
 
     Returns:
-        Dict: [description]
+        Dict: 
     """
     tags = list(count_word_occurence(annotation_file).items())[:num_tags]
     idx = 0
@@ -57,10 +57,10 @@ def build_video_dict(annotation_file: str, reverse_key: bool = False) -> Dict:
     """Create video index mapping
 
     Args:
-        annotation_file (str): [description]
+        annotation_file (str): 
 
     Returns:
-        Dict: [description]
+        Dict: 
     """
     video_dict = {}
     with open(annotation_file, 'r') as annot:
@@ -87,7 +87,7 @@ def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
     """Build vocab for annotation_file
 
     Args:
-        annotation_file (str): [description]
+        annotation_file (str): 
     Returns:
         (word_to_idx dict, idx_to_word dict, video_mapping dict)
     """
@@ -125,10 +125,10 @@ def annotation_to_idx(annotation: List[str], word_to_idx: Dict) -> List[int]:
     """Converts str annotation into integer indexes
 
     Args:
-        annotation (List[str]): [description]
+        annotation (List[str]): 
 
     Returns:
-        List[int]: [description]
+        List[int]: 
     """
     return [word_to_idx[x] if x in word_to_idx else -1 for x in annotation]
 
@@ -137,10 +137,10 @@ def idx_to_annotation(idxs: List[int], idx_to_word: Dict) -> List[str]:
     """Converts integer indexes into annotation
 
     Args:
-        annotation (List[str]): [description]
+        annotation (List[str]): 
 
     Returns:
-        List[int]: [description]
+        List[int]: 
     """
     return [idx_to_word[x] if x in idx_to_word else UNKNOWN_TAG for x in idxs]
 
@@ -149,8 +149,8 @@ def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)) -> Non
     """Converts all videos in root_path to sequence of images to each own directory
 
     Args:
-        root_path (str, optional): [description]. Defaults to '.'.
-        output_dim (Tuple, optional): [description]. Defaults to (224, 224).
+        root_path (str, optional): . Defaults to '.'.
+        output_dim (Tuple, optional): . Defaults to (224, 224).
     """
     allowed_ext = ['.avi', '.mp4']
 
@@ -179,7 +179,7 @@ def frames_to_video(root_path: str = '.') -> None:
     to videos. This is the reverse of video_to_frames function
 
     Args:
-        root_path (str, optional): [description]. Defaults to '.'.
+        root_path (str, optional): . Defaults to '.'.
     """
     allowed_ext = ['.tif', '.jpg', '.jpeg', '.png']
 
@@ -212,7 +212,7 @@ def split_train_val_test(root_path: str = '.') -> None:
     and video 1301-1970 will be for testing 
 
     Args:
-        root_path (str, optional): [description]. Defaults to '.'.
+        root_path (str, optional): . Defaults to '.'.
     """
     videos = sorted(os.listdir(root_path))
     subdir = {'train_val': [0, 1299], 'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}

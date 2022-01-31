@@ -43,11 +43,11 @@ def sdn_loss(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
     """Calculate loss using cross entropy of multi class loss
 
     Args:
-        pred (torch.Tensor): [description] (BATCH_SIZE, num_tags)
-        truth (torch.Tensor): [description] (BATCH_SIZE, num_tags)
+        pred (torch.Tensor):  (BATCH_SIZE, num_tags)
+        truth (torch.Tensor):  (BATCH_SIZE, num_tags)
 
     Returns:
-        torch.Tensor: [description] (1, )
+        torch.Tensor:  (1, )
     """
     epsilon = 1e-20
     loss = (truth * torch.log(pred + epsilon) + (1 - truth) * torch.log(1 - pred + epsilon)) * -1
@@ -60,11 +60,11 @@ def get_accuracy(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
     """Calculate mean average precision
 
     Args:
-        pred (torch.Tensor): [description] (BATCH_SIZE, num_tags)
-        truth (torch.Tensor): [description] (BATCH_SIZE, num_tags)
+        pred (torch.Tensor):  (BATCH_SIZE, num_tags)
+        truth (torch.Tensor):  (BATCH_SIZE, num_tags)
 
     Returns:
-        torch.Tensor: [description]
+        torch.Tensor: 
     """
     truth = truth.type(torch.LongTensor)
     pred = (pred >= 0.5).type(torch.LongTensor)
