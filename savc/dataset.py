@@ -125,6 +125,7 @@ class CompiledMSVD(Dataset):
         cnn_features_path: str,
         semantic_features_path: str,
         timestep: int = 80,
+        max_len: int = -1,
     ) -> None:
         super().__init__()
         assert os.path.exists(cnn_features_path)
@@ -140,19 +141,23 @@ class CompiledMSVD(Dataset):
         self.videos = list(map(lambda x: x[5:9], self.all_cnn_features))
         self.vocab_size = len(self.word_to_idx)
         self.timestep = timestep
+        self.max_len = max_len
 
     def __len__(self):
-        return len(self.videos)
+        if self.max_len == -1:
+            return len(self.videos)
+        else:
+            return self.max_len
 
     def __getitem__(self, index):
         video_idx = int(self.videos[index])
         video_name = self.video_dict[video_idx]
 
-        cnn_features_path = os.path.join(self.cnn_features_path, self.all_cnn_features[video_idx])
+        cnn_features_path = os.path.join(self.cnn_features_path, self.all_cnn_features[index])
         cnn_features = np.load(cnn_features_path)
         cnn_features = torch.FloatTensor(cnn_features)
 
-        semantic_features_path = os.path.join(self.semantic_features_path, self.all_semantic_features[video_idx])
+        semantic_features_path = os.path.join(self.semantic_features_path, self.all_semantic_features[index])
         semantic_features = np.load(semantic_features_path)
         semantic_features = torch.FloatTensor(semantic_features)
 
