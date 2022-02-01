@@ -11,15 +11,15 @@ class SemanticLSTM(torch.nn.Module):
     Details: https://arxiv.org/abs/1909.00121
     """
     def __init__(
-        self,
-        cnn_feature_size: int,
-        vocab_size: int,
-        input_size: int = 512,
-        hidden_size: int = 512,
-        embed_size: int = 512,
-        semantic_size: int = 300,
-        timestep: int = 80,
-        drop_out_rate: float = 0.3,
+            self,
+            cnn_feature_size: int,
+            vocab_size: int,
+            input_size: int = 512,
+            hidden_size: int = 512,
+            embed_size: int = 512,
+            semantic_size: int = 300,
+            timestep: int = 80,
+            drop_out_rate: float = 0.3,
     ) -> None:
         super().__init__()
         self.input_size = input_size
@@ -203,6 +203,7 @@ class SemanticLSTM(torch.nn.Module):
         cnn_features: torch.Tensor,
         semantics: torch.Tensor,
         epsilon: float = None,
+        mode: str = 'sample'  #argmax or sample
     ) -> torch.Tensor:
         """Forward propagate
 
@@ -257,12 +258,18 @@ class SemanticLSTM(torch.nn.Module):
                 if random.random() < epsilon:
                     caption = captions[:, timestep_idx + 1]
                 else:
-                    out = self.softmax(out)
-                    caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
+                    if mode == 'sample':
+                        out = self.softmax(out)
+                        caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
+                    else:
+                        caption = torch.argmax(out, dim=1).to(DEVICE).long()
 
             else:
-                out = self.softmax(out)
-                caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
+                if mode == 'sample':
+                    out = self.softmax(out)
+                    caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
+                else:
+                    caption = torch.argmax(out, dim=1).to(DEVICE).long()
 
         return result
 
