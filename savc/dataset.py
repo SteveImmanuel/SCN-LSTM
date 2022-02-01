@@ -124,7 +124,7 @@ class CompiledMSVD(Dataset):
         annotation_file: str,
         cnn_features_path: str,
         semantic_features_path: str,
-        beta: float,
+        beta: float = 0,
         timestep: int = 80,
         max_len: int = -1,
     ) -> None:
