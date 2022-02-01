@@ -14,14 +14,14 @@ from utils import build_video_dict
 
 def extract_features_2d_cnn(annotations_file: str, root_path: str, output_dir: str, batch_size: int = 32) -> None:
     os.makedirs(output_dir, exist_ok=True)
-    regnet_x_32gf = models.regnet_x_32gf(pretrained=True).to(DEVICE)
+    regnet_y_32gf = models.regnet_y_32gf(pretrained=True).to(DEVICE)
     # remove last layer
-    regnet_x_32gf.fc = torch.nn.Identity()
-    regnet_x_32gf.eval()
+    regnet_y_32gf.fc = torch.nn.Identity()
+    regnet_y_32gf.eval()
 
     all_videos = os.listdir(root_path)
     video_dict = build_video_dict(annotations_file)
-    preprocess_funcs = [Normalize(IMAGE_MEAN, IMAGE_STD), RandomCrop(227)]
+    preprocess_funcs = [Normalize(IMAGE_MEAN, IMAGE_STD)]
 
     for idx, video in enumerate(all_videos):
         print(f'Extracting video {idx+1}/{len(all_videos)}', end='\r')
@@ -34,7 +34,7 @@ def extract_features_2d_cnn(annotations_file: str, root_path: str, output_dir: s
         total_frames = 0
         for _, (X, _) in enumerate(data_loader):
             X = X.to(DEVICE)
-            out = regnet_x_32gf(X)
+            out = regnet_y_32gf(X)
             total_frames += out.shape[0]
 
             out = torch.sum(out, dim=0)
