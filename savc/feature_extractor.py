@@ -141,8 +141,7 @@ def extract_semantics(
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
-    output_dir = os.path.join(output_path, f'{cnn_2d_model}_{cnn_3d_model}')
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
 
     for batch_idx, (X, _) in enumerate(dataloader):
         print(f'Extracting semantics {batch_idx+1}/{dataloader_len}', end='\r')
@@ -154,7 +153,7 @@ def extract_semantics(
         out_numpy = out.cpu().detach().numpy()
 
         for i in range(out_numpy.shape[0]):
-            npy_path = os.path.join(output_dir, f'video{(batch_idx*batch_size)+i+start_idx:04d}_semantic_features.npy')
+            npy_path = os.path.join(output_path, f'video{(batch_idx*batch_size)+i+start_idx:04d}_semantic_features.npy')
             with open(npy_path, 'wb') as f:
                 np.save(f, out_numpy[i])
 
@@ -198,6 +197,6 @@ if __name__ == '__main__':
                     f'./checkpoints/sdn/{model_2d}_{model_3d}_best.pth',
                     'D:/ML Dataset/MSVD/annotations.txt',
                     f'D:/ML Dataset/MSVD/new_extracted/{type}',
-                    'D:/ML Dataset/MSVD/features/semantics',
+                    f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/semantics',
                     start_idx=start_idx,
                 )
