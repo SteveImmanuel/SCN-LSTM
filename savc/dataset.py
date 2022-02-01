@@ -124,6 +124,7 @@ class CompiledMSVD(Dataset):
         annotation_file: str,
         cnn_features_path: str,
         semantic_features_path: str,
+        beta: float,
         timestep: int = 80,
         max_len: int = -1,
     ) -> None:
@@ -142,6 +143,8 @@ class CompiledMSVD(Dataset):
         self.vocab_size = len(self.word_to_idx)
         self.timestep = timestep
         self.max_len = max_len
+
+        self.timestep_weight = 1 / (torch.arange(0, timestep)**beta)
 
     def __len__(self):
         if self.max_len == -1:
@@ -182,6 +185,6 @@ class CompiledMSVD(Dataset):
             ],
             0,
         ).long()
-        # weighted_mask = annot_mask * self.timestep_weight
+        weighted_mask = annot_mask * self.timestep_weight
 
-        return (cnn_features, semantic_features, label_annotation, annot_mask)
+        return (cnn_features, semantic_features, label_annotation, weighted_mask)
