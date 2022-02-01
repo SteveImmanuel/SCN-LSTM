@@ -16,12 +16,12 @@ def generate_epsilon(total_epoch: int) -> List[float]:
     """
     res = []
 
-    half = total_epoch // 2
-    for i in range(half):
+    threshold = 50
+    for i in range(threshold):
         res.append(1.0)
 
-    for i in range(half, total_epoch):
-        res.append(1 - (i - half + 1) / (total_epoch - half + 1) * (1 - 0.4))
+    for i in range(threshold, total_epoch):
+        res.append(1 - (i - threshold + 1) / (total_epoch - threshold + 1) * (1 - 0.4))
     return res
 
 
