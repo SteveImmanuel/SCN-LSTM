@@ -5,6 +5,26 @@ from typing import Tuple, Dict, List
 from constant import *
 
 
+def generate_epsilon(total_epoch: int) -> List[float]:
+    """Generate sampling probability for each epoch for SAVC model
+
+    Args:
+        total_epoch (int):
+
+    Returns:
+        List:
+    """
+    res = []
+
+    half = total_epoch // 2
+    for i in range(half):
+        res.append(1.0)
+
+    for i in range(half, total_epoch):
+        res.append(1 - (i - half + 1) / (total_epoch - half + 1) * (1 - 0.4))
+    return res
+
+
 def count_word_occurence(annotation_file: str) -> Dict:
     """Count all word occurence in annotation_file to build tags.
 
@@ -41,7 +61,7 @@ def build_tags(annotation_file: str, num_tags: int = 750, reverse_key: bool = Fa
     Returns:
         Dict: 
     """
-    tags = list(count_word_occurence(annotation_file).items())[:num_tags]
+    tags = list(count_word_occurence(annotation_file).items())[30:30 + num_tags]
     idx = 0
     res = {}
     for tag in tags:
@@ -235,4 +255,4 @@ if __name__ == '__main__':
 
     for model_2d in cnn2d_model:
         for model_3d in cnn3d_model:
-            split_train_val_test(f'D:/ML Dataset/MSVD/features/semantics/{model_2d}_{model_3d}')
+            split_train_val_test(f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/semantics')
