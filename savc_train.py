@@ -6,7 +6,7 @@ import traceback
 import math
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
-from utils import idx_to_annotation
+from utils import generate_epsilon, idx_to_annotation
 from savc.dataset import CompiledMSVD
 from savc.models.scn import SemanticLSTM
 from constant import *
@@ -78,16 +78,18 @@ def run():
     train_dataset = CompiledMSVD(
         annotation_path,
         os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'train_val'),
-        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantic', 'train_val'),
+        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'train_val'),
         timestep=timestep,
+        beta=0.7,
     )
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
 
     val_dataset = CompiledMSVD(
         annotation_path,
         os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'testing'),
-        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantic', 'testing'),
+        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'testing'),
         timestep=timestep,
+        beta=0.7,
         max_len=100,
     )
     val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
@@ -106,7 +108,7 @@ def run():
         model.load_state_dict(torch.load(model_path))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.999))
-    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, min_lr=1e-7, verbose=True)
+    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-7, verbose=True)
     loss_func = torch.nn.CrossEntropyLoss(reduction='none')
 
     if test_overfit:
@@ -146,7 +148,9 @@ def run():
 
     else:
         uid = int(time.time())
+
         try:
+            epsilons = generate_epsilon(epoch)
             batch_loss_log_path = os.path.join(log_dir, f'{uid}_batch_loss.csv')
             epoch_loss_log_path = os.path.join(log_dir, f'{uid}_epoch_loss.csv')
             batch_loss_log = create_batch_log_file(batch_loss_log_path)
@@ -169,7 +173,7 @@ def run():
                     cap = cap.to(DEVICE)
                     cap_mask = cap_mask.to(DEVICE)
 
-                    out = model(cap, cnn_features, semantic_features)
+                    out = model(cap, cnn_features, semantic_features, epsilons[epoch_idx])
 
                     out = out.view(-1, train_dataset.vocab_size)
                     cap = cap[:, 1:].contiguous().view(-1)
@@ -195,7 +199,7 @@ def run():
                     cap = cap.to(DEVICE)
                     cap_mask = cap_mask.to(DEVICE)
 
-                    out = model(cap, cnn_features, semantic_features)
+                    out = model(cap, cnn_features, semantic_features, epsilons[epoch_idx])
 
                     temp_cnn_features = cnn_features[0:1]
                     temp_semantic_features = semantic_features[0:1]
@@ -230,14 +234,14 @@ def run():
                 # save model checkpoint
                 if ckpt_dir:
                     if (epoch_idx % ckpt_interval == 0 or epoch_idx == epoch - 1):
-                        filename = f'{uid}_epoch{epoch_idx:03}_{avg_train_loss:.3f}_{avg_val_loss:.3f}.pth'
+                        filename = f'{uid}_epoch{epoch_idx:03}_{avg_train_loss:.3f}_{avg_val_loss:.3f}_{model_cnn_2d}_{model_cnn_3d}.pth'
                         filepath = os.path.join(ckpt_dir, filename)
                         torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
                         print(f'Model saved to {filepath}')
 
                     if avg_val_loss < best_val_loss:
                         best_val_loss = avg_val_loss
-                        filename = f'{uid}_best_weights.pth'
+                        filename = f'{uid}_{model_cnn_2d}_{model_cnn_3d}_best_weights.pth'
                         filepath = os.path.join(ckpt_dir, filename)
                         torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
                         print(f'Model saved to {filepath}')

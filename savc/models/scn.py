@@ -1,4 +1,5 @@
 import torch
+import random
 from torch.nn.parameter import Parameter
 from typing import Tuple
 from constant import DEVICE
@@ -33,6 +34,7 @@ class SemanticLSTM(torch.nn.Module):
         self.caption_embedding = torch.nn.Embedding(vocab_size, embed_size)
         self.sigmoid = torch.nn.Sigmoid()
         self.tanh = torch.nn.Tanh()
+        self.softmax = torch.nn.Softmax(dim=1)
         self.linear_last = torch.nn.Linear(hidden_size, vocab_size)
         self.dropout_caption_embed = torch.nn.Dropout(drop_out_rate)
         self.dropout_cnn = torch.nn.Dropout(drop_out_rate)
@@ -195,13 +197,20 @@ class SemanticLSTM(torch.nn.Module):
         c_mul = torch.einsum('ij,bi->bj', c_weight, hadamard)
         return c_mul
 
-    def forward(self, captions: torch.Tensor, cnn_features: torch.Tensor, semantics: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        captions: torch.Tensor,
+        cnn_features: torch.Tensor,
+        semantics: torch.Tensor,
+        epsilon: float = None,
+    ) -> torch.Tensor:
         """Forward propagate
 
         Args:
             captions (torch.Tensor):  (BATCH_SIZE, timestep)
             cnn_features (torch.Tensor):  (BATCH_SIZE, cnn_features_size)
             semantics (torch.Tensor):  (BATCH_SIZE, semantic_size)
+            epsilin (float): probability to sample or use training data for seed generating caption
 
         Returns:
             torch.Tensor:  (BATCH_SIZE, timestep-1, vocab_size)
@@ -243,8 +252,17 @@ class SemanticLSTM(torch.nn.Module):
 
             out = self.linear_last(last_ht)  # (BATCH_SIZE, vocab_size)
             result[:, timestep_idx, :] = out
-            caption = torch.argmax(out, dim=1).to(DEVICE).long()
-            caption = captions[:, timestep_idx + 1]
+
+            if self.training:
+                if random.random() < epsilon:
+                    caption = captions[:, timestep_idx + 1]
+                else:
+                    out = self.softmax(out)
+                    caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
+
+            else:
+                out = self.softmax(out)
+                caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
 
         return result
 
@@ -264,6 +282,7 @@ if __name__ == '__main__':
     semantics = torch.randn((batch_size, 300)).cuda()
     cnn_features = torch.randn((batch_size, 4000)).cuda()
     captions = torch.ones((batch_size, 80)).long().cuda()
+    epsilon = .5
 
-    res = model(captions, cnn_features, semantics)
+    res = model(captions, cnn_features, semantics, epsilon)
     print(res.shape)
