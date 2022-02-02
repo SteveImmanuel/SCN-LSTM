@@ -39,7 +39,7 @@ def count_word_occurence(annotation_file: str) -> Dict:
         line = annot.readline()
         while line:
             line = line.strip('\n')
-            tokens = line.split(' ')
+            tokens = line.split(' ')[1:]
             for token in tokens:
                 if token in res:
                     res[token] += 1
@@ -50,7 +50,7 @@ def count_word_occurence(annotation_file: str) -> Dict:
     return dict(sorted(res.items(), key=lambda item: item[1], reverse=True))
 
 
-def build_tags(annotation_file: str, num_tags: int = 750, reverse_key: bool = False) -> Dict:
+def build_tags(annotation_file: str, num_tags: int = SEMANTIC_SIZE, reverse_key: bool = False) -> Dict:
     """Build tag dictionary consisting of top num_tags words in terms of occurence
     in annotation_file
 
@@ -61,11 +61,16 @@ def build_tags(annotation_file: str, num_tags: int = 750, reverse_key: bool = Fa
     Returns:
         Dict: 
     """
-    tags = list(count_word_occurence(annotation_file).items())[30:30 + num_tags]
+    tags = count_word_occurence(annotation_file)
+    for word in BLACKLIST_WORDS:
+        tags.pop(word, None)
+
+    tags = list(tags.items())[:num_tags]
     idx = 0
+
     res = {}
     for tag in tags:
-        res[idx] = tag[0]
+        res[idx] = tag
         idx += 1
 
     if reverse_key:
