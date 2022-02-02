@@ -147,8 +147,7 @@ def get_model(pretrained_path: str, **kwargs):
     """
     Returns the model.
     """
-    model = ShuffleNet(num_classes=600, groups=3, **kwargs)
-    model.to(DEVICE)
+    model = ShuffleNet(num_classes=600, groups=3, **kwargs).to(DEVICE)
     checkpoint = torch.load(pretrained_path)
     state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
     model.load_state_dict(state_dict)
