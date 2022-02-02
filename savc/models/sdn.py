@@ -39,18 +39,20 @@ class SDN(torch.nn.Module):
         return self.classifier(X)
 
 
-def sdn_loss(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
+def sdn_loss(pred: torch.Tensor, truth: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     """Calculate loss using cross entropy of multi class loss
 
     Args:
         pred (torch.Tensor):  (BATCH_SIZE, num_tags)
         truth (torch.Tensor):  (BATCH_SIZE, num_tags)
+        mask (torch.Tensor):  (BATCH_SIZE, num_tags)
 
     Returns:
         torch.Tensor:  (1, )
     """
     epsilon = 1e-20
     loss = (truth * torch.log(pred + epsilon) + (1 - truth) * torch.log(1 - pred + epsilon)) * -1
+    loss = loss * mask
     loss = torch.sum(loss, dim=1)
     loss = torch.mean(loss, dim=0)
     return loss
@@ -73,12 +75,11 @@ def get_accuracy(pred: torch.Tensor, truth: torch.Tensor) -> torch.Tensor:
 
 
 if __name__ == '__main__':
-    uid = int(time.time())
     annotation_path = 'D:/ML Dataset/MSVD/annotations.txt'
     train_path = 'D:/ML Dataset/MSVD/new_extracted/train_val'
     val_path = 'D:/ML Dataset/MSVD/new_extracted/test'
-    cnn_2d_model = 'vgg'  # regnetx32 or vgg
-    cnn_3d_model = 'shufflenetv2'  # shufflenet or shufflenetv2
+    cnn_2d_model = 'regnety32'  # regnety32, regnetx32, vgg
+    cnn_3d_model = 'resnext101'  # resnext101, shufflenet, shufflenetv2
     batch_size = 20
     epoch = 100
     learning_rate = 5e-3
@@ -115,12 +116,13 @@ if __name__ == '__main__':
 
         print('###Training Phase###')
         model.train()
-        for batch_idx, (X, y) in enumerate(train_dataloader):
+        for batch_idx, (X, y, mask) in enumerate(train_dataloader):
             X = X.to(DEVICE)
             y = y.to(DEVICE)
+            mask = mask.to(DEVICE)
             out = model(X)
 
-            batch_loss = loss_func(out, y)
+            batch_loss = loss_func(out, y, mask)
             accuracy = get_accuracy(out, y)
 
             optimizer.zero_grad()
@@ -133,12 +135,13 @@ if __name__ == '__main__':
 
         print('\n###Validation Phase###')
         model.eval()
-        for batch_idx, (X, y) in enumerate(val_dataloader):
+        for batch_idx, (X, y, mask) in enumerate(val_dataloader):
             X = X.to(DEVICE)
             y = y.to(DEVICE)
+            mask = mask.to(DEVICE)
             out = model(X)
 
-            batch_loss = loss_func(out, y)
+            batch_loss = loss_func(out, y, mask)
             accuracy = get_accuracy(out, y)
 
             val_batch_losses[batch_idx] = batch_loss.item()
@@ -157,13 +160,12 @@ if __name__ == '__main__':
         if avg_val_accuracy > best_acc:
             best_acc = avg_val_accuracy
 
-            filename = f'{uid}_{cnn_2d_model}_{cnn_3d_model}_best.pth'
+            filename = f'{cnn_2d_model}_{cnn_3d_model}_best.pth'
             filepath = os.path.join(ckpt_dir, filename)
             checkpoint = {
                 'cnn_2d_model': cnn_2d_model,
                 'cnn_3d_model': cnn_3d_model,
                 'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
             }
             torch.save(checkpoint, os.path.join(ckpt_dir, filename))
             print(f'Model saved to {filepath}')
