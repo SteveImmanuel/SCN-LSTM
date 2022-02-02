@@ -45,12 +45,9 @@ print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
 
 checkpoint = torch.load(model_path)
-# model_cnn_2d = checkpoint['model_cnn_2d']
-# model_cnn_3d = checkpoint['model_cnn_3d']
-# model_state_dict = checkpoint['model_state_dict']
-model_cnn_2d = 'regnetx32'
-model_cnn_3d = 'shufflenetv2'
-model_state_dict = checkpoint
+model_cnn_2d = checkpoint['model_cnn_2d']
+model_cnn_3d = checkpoint['model_cnn_3d']
+model_state_dict = checkpoint['model_state_dict']
 
 # prepare train and validation dataset
 test_dataset = CompiledMSVD(
