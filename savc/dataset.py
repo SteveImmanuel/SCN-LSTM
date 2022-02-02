@@ -88,6 +88,9 @@ class CNNExtractedMSVD(Dataset):
         self.tag_dict = build_tags(annotation_file, num_tags=num_tags, reverse_key=True)
         self.videos = list(set(map(lambda x: x[5:9], os.listdir(self.root_path))))
 
+        occurence = list(map(lambda x: x[1], self.tag_dict.keys()))
+        self.weight_mask = torch.FloatTensor(occurence)**.5
+
     def __len__(self):
         return len(self.videos)
 
@@ -101,17 +104,19 @@ class CNNExtractedMSVD(Dataset):
         cnn3d_features = torch.FloatTensor(np.load(cnn3d_npy_path))
         cnn_features = torch.cat((cnn3d_features, cnn2d_features), dim=0)
 
-        label = torch.zeros(len(self.tag_dict))
+        tags = {key[0]: value for key, value in self.tag_dict.items()}
+
+        label = torch.zeros(len(tags))
         unique_words = set()
         annotations = self.video_caption_mapping[video_name]
         for annotation in annotations:
             for token in annotation:
                 unique_words.add(token)
         for word in unique_words:
-            if word in self.tag_dict:
-                label[self.tag_dict[word]] = 1.0
+            if word in tags:
+                label[tags[word]] = 1.0
 
-        return (cnn_features, label)
+        return (cnn_features, label, self.weight_mask)
 
 
 class CompiledMSVD(Dataset):
