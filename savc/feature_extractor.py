@@ -7,6 +7,7 @@ from torchvision.transforms import RandomCrop, Normalize, Resize
 from savc.dataset import CNNExtractedMSVD, RawMSVDDataset, SequenceImageMSVDDataset
 from savc.models.shufflenet import get_model as ShuffleNet
 from savc.models.shufflenetv2 import get_model as ShuffleNetV2
+from savc.models.resnext import get_model as ResNext101
 from savc.models.sdn import SDN
 from constant import *
 from utils import build_video_dict
@@ -46,7 +47,7 @@ def extract_features_2d_cnn(annotations_file: str, root_path: str, output_dir: s
                 res += out_numpy
 
         res /= total_frames
-        npy_path = os.path.join(output_dir, f'video{video_index:04d}_cnn_2d_regnetx32.npy')
+        npy_path = os.path.join(output_dir, f'video{video_index:04d}_cnn_2d_regnety32.npy')
         with open(npy_path, 'wb') as f:
             np.save(f, res)
 
@@ -62,7 +63,7 @@ def extract_features_3d_cnn(
     os.makedirs(output_dir, exist_ok=True)
     if model_name == 'shufflenetv2':
         model = ShuffleNetV2(
-            './checkpoints/shufflenet/kinetics_shufflenetv2_2.0x_RGB_16_best.pth',
+            './checkpoints/shufflenetv2/kinetics_shufflenetv2_2.0x_RGB_16_best.pth',
             width_mult=2.,
         )
     elif model_name == 'shufflenet':
@@ -70,6 +71,8 @@ def extract_features_3d_cnn(
             './checkpoints/shufflenet/kinetics_shufflenet_2.0x_G3_RGB_16_best.pth',
             width_mult=2.,
         )
+    elif model_name == 'resnext101':
+        model = ResNext101('./checkpoints/resnext101/kinetics_resnext_101_RGB_16_best.pth')
     else:
         assert False, f'Unsupported model {model_name}'
     model.eval()
@@ -143,7 +146,7 @@ def extract_semantics(
 
     os.makedirs(output_path, exist_ok=True)
 
-    for batch_idx, (X, _) in enumerate(dataloader):
+    for batch_idx, (X, _, _) in enumerate(dataloader):
         print(f'Extracting semantics {batch_idx+1}/{dataloader_len}', end='\r')
 
         X = X.to(DEVICE)
@@ -164,25 +167,19 @@ if __name__ == '__main__':
     # extract_features_2d_cnn(
     #     'D:/ML Dataset/MSVD/annotations.txt',
     #     'D:/ML Dataset/MSVD/YouTubeClips',
-    #     'D:/ML Dataset/MSVD/new_extracted',
+    #     'D:/ML Dataset/MSVD/new_extracted/regnety',
     #     batch_size=8,
     # )
     # extract_features_3d_cnn(
     #     'D:/ML Dataset/MSVD/annotations.txt',
     #     'D:/ML Dataset/MSVD/YouTubeClips',
-    #     'D:/ML Dataset/MSVD/new_extracted',
-    #     model_name='shufflenet',
-    # )
-    # combine_cnn_features(
-    #     'D:/ML Dataset/MSVD/new_extracted/train',
-    #     f'D:/ML Dataset/MSVD/combined_feature/{cnn2d_model}_{cnn3d_model}',
-    #     cnn2d_model,
-    #     cnn3d_model,
+    #     'D:/ML Dataset/MSVD/new_extracted/resnext101_with_std',
+    #     model_name='resnext101',
     # )
 
-    cnn2d_model = ['regnetx32', 'vgg']
-    cnn3d_model = ['shufflenetv2', 'shufflenet']
-    data_type = ['train', 'test', 'validation']
+    cnn2d_model = ['regnety32', 'regnetx32', 'vgg']
+    cnn3d_model = ['resnext101', 'shufflenet', 'shufflenetv2']
+    data_type = ['train', 'test', 'validation', 'train_val']
 
     for model_2d in cnn2d_model:
         for model_3d in cnn3d_model:
@@ -193,6 +190,12 @@ if __name__ == '__main__':
                     start_idx = 1200
                 else:
                     start_idx = 1300
+                # combine_cnn_features(
+                #     f'D:/ML Dataset/MSVD/new_extracted/{type}',
+                #     f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/cnn/{type}',
+                #     model_2d,
+                #     model_3d,
+                # )
                 extract_semantics(
                     f'./checkpoints/sdn/{model_2d}_{model_3d}_best.pth',
                     'D:/ML Dataset/MSVD/annotations.txt',
