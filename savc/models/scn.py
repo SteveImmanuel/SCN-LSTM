@@ -11,15 +11,15 @@ class SemanticLSTM(torch.nn.Module):
     Details: https://arxiv.org/abs/1909.00121
     """
     def __init__(
-            self,
-            cnn_feature_size: int,
-            vocab_size: int,
-            input_size: int = 512,
-            hidden_size: int = 512,
-            embed_size: int = 512,
-            semantic_size: int = 300,
-            timestep: int = 80,
-            drop_out_rate: float = 0.3,
+        self,
+        cnn_feature_size: int,
+        vocab_size: int,
+        input_size: int = 512,
+        hidden_size: int = 512,
+        embed_size: int = 512,
+        semantic_size: int = 300,
+        timestep: int = 80,
+        drop_out_rate: float = 0.3,
     ) -> None:
         super().__init__()
         self.input_size = input_size
@@ -29,6 +29,7 @@ class SemanticLSTM(torch.nn.Module):
         self.cnn_feature_size = cnn_feature_size
         self.vocab_size = vocab_size
         self.timestep = timestep
+        self.drop_out_rate = drop_out_rate
 
         self._init_weights()
         self.caption_embedding = torch.nn.Embedding(vocab_size, embed_size)
@@ -193,17 +194,16 @@ class SemanticLSTM(torch.nn.Module):
 
         a_mul = torch.einsum('ij,bi->bj', a_weight, vector)
         b_mul = torch.einsum('ij,bi->bj', b_weight, semantic)
-        hadamard = a_mul * b_mul
-        c_mul = torch.einsum('ij,bi->bj', c_weight, hadamard)
+        c_mul = torch.einsum('ij,bi->bj', c_weight, a_mul * b_mul)
         return c_mul
 
     def forward(
-        self,
-        captions: torch.Tensor,
-        cnn_features: torch.Tensor,
-        semantics: torch.Tensor,
-        epsilon: float = None,
-        mode: str = 'sample'  #argmax or sample
+            self,
+            captions: torch.Tensor,
+            cnn_features: torch.Tensor,
+            semantics: torch.Tensor,
+            epsilon: float = None,
+            mode: str = 'sample',  #argmax or sample
     ) -> torch.Tensor:
         """Forward propagate
 
@@ -211,7 +211,7 @@ class SemanticLSTM(torch.nn.Module):
             captions (torch.Tensor):  (BATCH_SIZE, timestep)
             cnn_features (torch.Tensor):  (BATCH_SIZE, cnn_features_size)
             semantics (torch.Tensor):  (BATCH_SIZE, semantic_size)
-            epsilin (float): probability to sample or use training data for seed generating caption
+            epsilon (float): probability to sample or use training data for seed generating caption
 
         Returns:
             torch.Tensor:  (BATCH_SIZE, timestep-1, vocab_size)
