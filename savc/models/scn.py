@@ -214,7 +214,9 @@ class SemanticLSTM(torch.nn.Module):
             epsilon (float): probability to sample or use training data for seed generating caption
 
         Returns:
-            torch.Tensor:  (BATCH_SIZE, timestep-1, vocab_size)
+            torch.Tensor: 
+                if training (BATCH_SIZE, timestep-1, vocab_size)
+                else evaluation (BATCH_SIZE, timestep-1)
         """
         batch_size, _ = captions.shape
         last_ht = torch.zeros(batch_size, self.hidden_size).to(DEVICE)
@@ -223,7 +225,11 @@ class SemanticLSTM(torch.nn.Module):
         cnn_features = self.dropout_cnn(cnn_features)
         caption = captions[:, 0]
 
-        result = torch.empty(batch_size, self.timestep - 1, self.vocab_size).to(DEVICE)
+        if self.training:
+            result = torch.empty(batch_size, self.timestep - 1, self.vocab_size).to(DEVICE)
+        else:
+            result = torch.empty(batch_size, self.timestep - 1).to(DEVICE)
+
         for timestep_idx in range(self.timestep - 1):
             caption_embed = self.caption_embedding(caption)  # (BATCH_SIZE, embed_size)
             caption_embed = self.dropout_caption_embed(caption_embed)
@@ -252,9 +258,10 @@ class SemanticLSTM(torch.nn.Module):
             last_ht = o_gate * self.tanh(last_ct)
 
             out = self.linear_last(last_ht)  # (BATCH_SIZE, vocab_size)
-            result[:, timestep_idx, :] = out
 
             if self.training:
+                result[:, timestep_idx, :] = out
+
                 if random.random() < epsilon:
                     caption = captions[:, timestep_idx + 1]
                 else:
@@ -270,6 +277,8 @@ class SemanticLSTM(torch.nn.Module):
                     caption = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
                 else:
                     caption = torch.argmax(out, dim=1).to(DEVICE).long()
+
+                result[:, timestep_idx] = caption
 
         return result
 
