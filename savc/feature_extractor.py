@@ -177,9 +177,9 @@ if __name__ == '__main__':
     #     model_name='resnext101',
     # )
 
-    cnn2d_model = ['regnety32', 'regnetx32', 'vgg']
+    cnn2d_model = ['vgg', 'regnetx32', 'regnety32']
     cnn3d_model = ['resnext101', 'shufflenet', 'shufflenetv2']
-    data_type = ['train', 'test', 'validation', 'train_val']
+    data_type = ['train', 'testing', 'validation', 'train_val']
 
     for model_2d in cnn2d_model:
         for model_3d in cnn3d_model:
@@ -190,16 +190,16 @@ if __name__ == '__main__':
                     start_idx = 1200
                 else:
                     start_idx = 1300
-                # combine_cnn_features(
-                #     f'D:/ML Dataset/MSVD/new_extracted/{type}',
-                #     f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/cnn/{type}',
-                #     model_2d,
-                #     model_3d,
-                # )
+                combine_cnn_features(
+                    f'D:/ML Dataset/MSVD/new_extracted/{type}',
+                    f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/cnn/{type}',
+                    model_2d,
+                    model_3d,
+                )
                 extract_semantics(
                     f'./checkpoints/sdn/{model_2d}_{model_3d}_best.pth',
                     'D:/ML Dataset/MSVD/annotations.txt',
                     f'D:/ML Dataset/MSVD/new_extracted/{type}',
-                    f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/semantics',
+                    f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/semantics/{type}',
                     start_idx=start_idx,
                 )
