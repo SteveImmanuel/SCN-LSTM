@@ -9,13 +9,27 @@ from constant import *
 from utils import build_video_dict
 
 
-def extract_features(annotations_file: str, root_path: str, output_dir: str, batch_size: int = 32) -> None:
+def extract_features(
+    model_type: str,
+    annotations_file: str,
+    root_path: str,
+    output_dir: str,
+    batch_size: int = 32,
+) -> None:
     os.makedirs(output_dir, exist_ok=True)
-    vgg = models.vgg16(pretrained=True).to(DEVICE)
-    # use output from fc7, remove the rest
-    vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:-1])
-    vgg.eval()
 
+    if model_type == 'vgg':
+        model = models.vgg16(pretrained=True).to(DEVICE)
+        # use output from fc7, remove the rest
+        model.classifier = torch.nn.Sequential(*list(model.classifier.children())[:-1])
+    elif model_type == 'regnety32':
+        model = models.regnet_y_32gf(pretrained=True).to(DEVICE)
+        # remove last layer
+        model.fc = torch.nn.Identity()
+    else:
+        assert False, f'Unsupported model {model_type}'
+
+    model.eval()
     all_videos = os.listdir(root_path)
     video_dict = build_video_dict(annotations_file)
     preprocess_funcs = [Normalize(IMAGE_MEAN, IMAGE_STD), RandomCrop(227)]
@@ -31,7 +45,7 @@ def extract_features(annotations_file: str, root_path: str, output_dir: str, bat
 
         for batch_idx, (X, _) in enumerate(data_loader):
             X = X.to(DEVICE)
-            out = vgg(X)
+            out = model(X)
             out_numpy = out.cpu().detach().numpy()
 
             for i in range(out_numpy.shape[0]):
@@ -76,3 +90,13 @@ def parse_features_from_txt(feature_file: str, output_dir: str) -> None:
             line = f.readline()
 
     print('\nParse complete')
+
+
+if __name__ == '__main__':
+    extract_features(
+        'regnety32',
+        'D:/ML Dataset/MSVD/annotations.txt',
+        'D:/ML Dataset/MSVD/YouTubeClips',
+        'D:/ML Dataset/MSVD/regnety32_extracted',
+        batch_size=8,
+    )
