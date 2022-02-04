@@ -7,7 +7,7 @@ import math
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from utils import generate_epsilon, idx_to_annotation
-from savc.dataset import CompiledMSVD
+from savc.dataset import CompiledMSVD, ExtractedMSVD
 from savc.models.scn import SemanticLSTM
 from constant import *
 from helper import *
@@ -16,7 +16,7 @@ from helper import *
 def run():
     parser = argparse.ArgumentParser(description='Train S2VT Model')
     parser.add_argument('--annotation-path', help='File path to annotation', required=True)
-    parser.add_argument('--dataset-dir', help='Directory path to training annotation', required=True)
+    parser.add_argument('--dataset-dir', help='Directory path to dataset for train and validation', required=True)
     parser.add_argument('--ckpt-dir', help='Checkpoint directory, will save for each epoch', default='./checkpoints')
     parser.add_argument('--ckpt-interval', help='How many epoch between checkpoints', default=1, type=int)
     parser.add_argument('--log-dir', help='Log directory', default='./logs')
@@ -28,19 +28,25 @@ def run():
     parser.add_argument(
         '--model-cnn-2d',
         help='2D CNN model architecture',
-        choices=['vgg', 'regnetx32'],
+        choices=['vgg', 'regnetx32', 'regnety32', 'resnext'],
         required=True,
     )
     parser.add_argument(
         '--model-cnn-3d',
         help='3D CNN model architecture',
-        choices=['shufflenet', 'shufflenetv2'],
+        choices=['shufflenet', 'shufflenetv2', 'resnext101', 'eco'],
         required=True,
     )
     parser.add_argument(
         '--test-overfit',
         help='Sanity check to test overfit model with very small dataset',
         action='store_true',
+    )
+    parser.add_argument(
+        '--mode',
+        help='Use sample distribution or argmax',
+        choices=['sample', 'argmax'],
+        required=True,
     )
 
     args = parser.parse_args()
@@ -57,12 +63,14 @@ def run():
     ckpt_dir = args.ckpt_dir
     ckpt_interval = args.ckpt_interval
     log_dir = args.log_dir
+    mode = args.mode
 
     # show training config
     print('\n######### TRAINING CONFIGURATION #########')
     print('Annotation file:', annotation_path)
     print('2D CNN model:', model_cnn_2d)
     print('3D CNN model:', model_cnn_3d)
+    print('Generate mode:', mode)
     print('Dataset directory:', dataset_dir)
     print('Checkpoint directory:', ckpt_dir)
     print('Checkpoint interval:', ckpt_interval)
@@ -75,21 +83,40 @@ def run():
     print('Test overfit:', test_overfit)
 
     # prepare train and validation dataset
-    train_dataset = CompiledMSVD(
+    # train_dataset = CompiledMSVD(
+    #     annotation_path,
+    #     os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'train_val'),
+    #     os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'train_val'),
+    #     timestep=timestep,
+    #     beta=0.5,
+    # )
+    train_dataset = ExtractedMSVD(
         annotation_path,
-        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'train_val'),
-        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'train_val'),
+        os.path.join(dataset_dir, 'msvd_resnext_eco.npy'),
+        os.path.join(dataset_dir, 'msvd_tag_gt_4_msvd.npy'),
         timestep=timestep,
+        max_sentence_len=25,
         beta=0.7,
+        type='train',
     )
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size)
 
-    val_dataset = CompiledMSVD(
+    # val_dataset = CompiledMSVD(
+    #     annotation_path,
+    #     os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'testing'),
+    #     os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'testing'),
+    #     timestep=timestep,
+    #     beta=7,
+    #     max_len=100,
+    # )
+    val_dataset = ExtractedMSVD(
         annotation_path,
-        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'testing'),
-        os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'testing'),
+        os.path.join(dataset_dir, 'msvd_resnext_eco.npy'),
+        os.path.join(dataset_dir, 'msvd_tag_gt_4_msvd.npy'),
         timestep=timestep,
+        max_sentence_len=25,
         beta=0.7,
+        type='test',
         max_len=100,
     )
     val_dataloader = DataLoader(val_dataset, shuffle=True, batch_size=batch_size)
@@ -98,14 +125,18 @@ def run():
     model = SemanticLSTM(
         cnn_feature_size=CNN_3D_FEATURES_SIZE[model_cnn_3d] + CNN_2D_FEATURES_SIZE[model_cnn_2d],
         vocab_size=train_dataset.vocab_size,
-        semantic_size=300,
+        semantic_size=SEMANTIC_SIZE,
+        hidden_size=512,
+        input_size=512,
+        embed_size=300,
         timestep=timestep,
-        drop_out_rate=0.3,
+        drop_out_rate=0.5,
     ).to(DEVICE)
 
     if model_path and not test_overfit:
+        checkpoint = torch.load(model_path)
         print(f'\nLoading pretrained model in {model_path}\n')
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(checkpoint['model_state_dict'])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.999))
     lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-7, verbose=True)
@@ -150,7 +181,21 @@ def run():
         uid = int(time.time())
 
         try:
+            save_checkpoint = {
+                'model_state_dict': None,
+                'model_cnn_2d': model_cnn_2d,
+                'model_cnn_3d': model_cnn_3d,
+                'hidden_size': model.hidden_size,
+                'input_size': model.input_size,
+                'drop_out_rate': model.drop_out_rate,
+                'vocab_size': model.vocab_size,
+                'semantic_size': model.semantic_size,
+                'cnn_feature_size': model.cnn_feature_size,
+                'timestep': model.timestep,
+                'embed_size': model.embed_size
+            }
             epsilons = generate_epsilon(epoch)
+            # epsilons = [1.0] * epoch
             batch_loss_log_path = os.path.join(log_dir, f'{uid}_batch_loss.csv')
             epoch_loss_log_path = os.path.join(log_dir, f'{uid}_epoch_loss.csv')
             batch_loss_log = create_batch_log_file(batch_loss_log_path)
@@ -173,7 +218,7 @@ def run():
                     cap = cap.to(DEVICE)
                     cap_mask = cap_mask.to(DEVICE)
 
-                    out = model(cap, cnn_features, semantic_features, epsilons[epoch_idx])
+                    out = model(cap, cnn_features, semantic_features, epsilons[epoch_idx], mode=mode)
 
                     out = out.view(-1, train_dataset.vocab_size)
                     cap = cap[:, 1:].contiguous().view(-1)
@@ -199,7 +244,7 @@ def run():
                     cap = cap.to(DEVICE)
                     cap_mask = cap_mask.to(DEVICE)
 
-                    out = model(cap, cnn_features, semantic_features, epsilons[epoch_idx])
+                    out = model(cap, cnn_features, semantic_features, epsilons[epoch_idx], mode=mode)
 
                     temp_cnn_features = cnn_features[0:1]
                     temp_semantic_features = semantic_features[0:1]
@@ -223,7 +268,7 @@ def run():
                 epoch_loss_log.flush()
 
                 model.eval()
-                temp_out = model(temp_cap, temp_cnn_features, temp_semantic_features)[0]
+                temp_out = model(temp_cap, temp_cnn_features, temp_semantic_features, mode=mode)[0]
                 temp_out = torch.argmax(temp_out, dim=1).to(DEVICE).long()
                 temp_out = idx_to_annotation(temp_out.tolist(), val_dataset.idx_to_word)
                 temp_cap = idx_to_annotation(temp_cap[0].tolist(), val_dataset.idx_to_word)
@@ -234,16 +279,18 @@ def run():
                 # save model checkpoint
                 if ckpt_dir:
                     if (epoch_idx % ckpt_interval == 0 or epoch_idx == epoch - 1):
-                        filename = f'{uid}_epoch{epoch_idx:03}_{avg_train_loss:.3f}_{avg_val_loss:.3f}_{model_cnn_2d}_{model_cnn_3d}.pth'
+                        filename = f'{uid}_{model_cnn_2d}_{model_cnn_3d}_epoch{epoch_idx:03}_{avg_train_loss:.3f}_{avg_val_loss:.3f}.pth'
                         filepath = os.path.join(ckpt_dir, filename)
-                        torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
+                        save_checkpoint['model_state_dict'] = model.state_dict()
+                        torch.save(save_checkpoint, os.path.join(ckpt_dir, filename))
                         print(f'Model saved to {filepath}')
 
                     if avg_val_loss < best_val_loss:
                         best_val_loss = avg_val_loss
                         filename = f'{uid}_{model_cnn_2d}_{model_cnn_3d}_best_weights.pth'
                         filepath = os.path.join(ckpt_dir, filename)
-                        torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
+                        save_checkpoint['model_state_dict'] = model.state_dict()
+                        torch.save(save_checkpoint, os.path.join(ckpt_dir, filename))
                         print(f'Model saved to {filepath}')
 
                 lr_scheduler.step(avg_val_loss)
@@ -252,9 +299,10 @@ def run():
             traceback.print_exc()
             if ckpt_dir:
                 print('Error occured, saving current progress')
-                filename = f'{uid}_backup_error.pth'
+                filename = f'{uid}_{model_cnn_2d}_{model_cnn_3d}_backup_error.pth'
                 filepath = os.path.join(ckpt_dir, filename)
-                torch.save(model.state_dict(), os.path.join(ckpt_dir, filename))
+                save_checkpoint['model_state_dict'] = model.state_dict()
+                torch.save(save_checkpoint, os.path.join(ckpt_dir, filename))
                 print(f'Model saved to {filepath}')
 
         finally:
@@ -265,4 +313,4 @@ def run():
 if __name__ == '__main__':
     run()
 
-# python savc_train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --dataset-dir "D:/ML Dataset/MSVD/features" --batch-size 10 --epoch 100 --learning-rate 1e-4 --ckpt-interval 10 --model-cnn-2d "regnetx32" --model-cnn-3d "shufflenetv2" --ckpt-dir "./checkpoints/savc" --log-dir "./logs/savc"
+# python savc_train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --dataset-dir "D:/ML Dataset/MSVD/features" --batch-size 64 --epoch 150 --learning-rate 5e-4 --ckpt-interval 10 --model-cnn-2d "regnety32" --model-cnn-3d "resnext101" --ckpt-dir "./checkpoints/savc" --log-dir "./logs/savc" --mode argmax
