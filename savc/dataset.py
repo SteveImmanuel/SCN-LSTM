@@ -193,3 +193,80 @@ class CompiledMSVD(Dataset):
         weighted_mask = annot_mask * self.timestep_weight
 
         return (cnn_features, semantic_features, label_annotation, weighted_mask)
+
+
+class ExtractedMSVD(Dataset):
+    def __init__(
+        self,
+        annotation_file: str,
+        cnn_features_path: str,
+        semantic_features_path: str,
+        type: str,  # train or test
+        beta: float = 0,
+        timestep: int = 80,
+        max_len: int = -1,
+        max_sentence_len: int = 25,
+    ) -> None:
+        super().__init__()
+        assert os.path.exists(cnn_features_path)
+        assert os.path.exists(semantic_features_path)
+        assert os.path.exists(annotation_file)
+        assert timestep >= max_sentence_len
+
+        self.type = type
+        self.word_to_idx, self.idx_to_word, self.video_caption_mapping = build_vocab(annotation_file)
+        self.video_dict = build_video_dict(annotation_file, reverse_key=True)
+        self.vocab_size = len(self.word_to_idx)
+        self.timestep = timestep
+        self.max_len = max_len
+        self.max_sentence_len = max_sentence_len
+        self.timestep_weight = 1 / (torch.arange(0, timestep)**beta)
+        self.all_cnn_features = np.load(cnn_features_path)
+        self.all_semantic_features = np.load(semantic_features_path)
+
+    def __len__(self):
+        if self.type == 'train':
+            return 1300
+        else:
+            if self.max_len == -1:
+                return 670
+            else:
+                return self.max_len
+
+    def __getitem__(self, index):
+        if self.type != 'train':
+            index += 1300
+        video_name = self.video_dict[index]
+
+        # get label
+        annot_idx = random.randint(0, len(self.video_caption_mapping[video_name]) - 1)
+        annot_raw = self.video_caption_mapping[video_name][annot_idx]  # already contains BOS and EOS
+        while len(annot_raw) > self.max_sentence_len:
+            annot_idx = random.randint(0, len(self.video_caption_mapping[video_name]) - 1)
+            annot_raw = self.video_caption_mapping[video_name][annot_idx]  # already contains BOS and EOS
+
+        # pad ending annotation with <EOS> until the length matches timestep
+        annot_padded = annot_raw + [EOS_TAG] * (self.timestep - len(annot_raw))
+
+        annotation = annotation_to_idx(annot_padded, self.word_to_idx)
+        label_annotation = torch.LongTensor(annotation)  # output dim = (timestep)
+
+        annot_mask = torch.cat(
+            [
+                torch.zeros(1),  # BOS tag
+                torch.ones(len(annot_raw) - 1),  # annotation + EOS tag
+                torch.zeros(self.timestep - len(annot_raw)),
+            ],
+            0,
+        ).long()
+        weighted_mask = annot_mask * self.timestep_weight
+
+        cnn_features = torch.FloatTensor(self.all_cnn_features[index])
+        semantic_features = torch.FloatTensor(self.all_semantic_features[index])
+
+        return (
+            cnn_features,
+            semantic_features,
+            label_annotation,
+            weighted_mask,
+        )
