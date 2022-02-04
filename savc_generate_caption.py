@@ -6,7 +6,7 @@ import time
 import json
 from datetime import datetime
 from torch.utils.data import DataLoader
-from savc.dataset import CompiledMSVD
+from savc.dataset import CompiledMSVD, ExtractedMSVD
 from savc.models.scn import SemanticLSTM
 from utils import idx_to_annotation
 from constant import *
@@ -41,34 +41,45 @@ print('Annotation file:', annotation_path)
 print('Output:', out_path)
 print('Test directory:', dataset_dir)
 print('Timestep:', timestep)
+print('Generate mode:', mode)
 print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
 
 checkpoint = torch.load(model_path)
 model_cnn_2d = checkpoint['model_cnn_2d']
 model_cnn_3d = checkpoint['model_cnn_3d']
-model_state_dict = checkpoint['model_state_dict']
 
 # prepare train and validation dataset
-test_dataset = CompiledMSVD(
+# test_dataset = CompiledMSVD(
+#     annotation_path,
+#     os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'testing'),
+#     os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'testing'),
+#     timestep=timestep,
+# )
+test_dataset = ExtractedMSVD(
     annotation_path,
-    os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'cnn', 'testing'),
-    os.path.join(dataset_dir, f'{model_cnn_2d}_{model_cnn_3d}', 'semantics', 'testing'),
+    os.path.join(dataset_dir, 'msvd_resnext_eco.npy'),
+    os.path.join(dataset_dir, 'msvd_tag_gt_4_msvd.npy'),
     timestep=timestep,
+    beta=0.5,
+    type='test',
 )
 test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=batch_size)
 
 # create and prepare model
 model = SemanticLSTM(
-    cnn_feature_size=CNN_3D_FEATURES_SIZE[model_cnn_3d] + CNN_2D_FEATURES_SIZE[model_cnn_2d],
-    vocab_size=test_dataset.vocab_size,
-    semantic_size=300,
-    timestep=timestep,
-    drop_out_rate=0.5,
+    cnn_feature_size=checkpoint['cnn_feature_size'],
+    vocab_size=checkpoint['vocab_size'],
+    semantic_size=checkpoint['semantic_size'],
+    hidden_size=checkpoint['hidden_size'],
+    input_size=checkpoint['input_size'],
+    embed_size=checkpoint['embed_size'],
+    timestep=checkpoint['timestep'],
+    drop_out_rate=checkpoint['drop_out_rate'],
 ).to(DEVICE)
 
 print(f'\nLoading pretrained model in {model_path}\n')
-model.load_state_dict(model_state_dict)
+model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 
 try:
