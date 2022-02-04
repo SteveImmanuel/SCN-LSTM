@@ -17,12 +17,14 @@ CNN_3D_FEATURES_SIZE = {
     'shufflenet': 1920,
     'shufflenetv2': 2048,
     'resnext101': 2048,
+    'eco': 1536,
 }
 
 CNN_2D_FEATURES_SIZE = {
     'vgg': 4096,
     'regnetx32': 2520,
     'regnety32': 3712,
+    'resnext': 2048,
 }
 
 SEMANTIC_SIZE = 300
