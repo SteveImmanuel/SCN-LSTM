@@ -4,7 +4,6 @@ import argparse
 import torch
 import time
 import json
-from datetime import datetime
 from torch.utils.data import DataLoader
 from savc.dataset import CompiledMSVD, ExtractedMSVD
 from savc.models.scn import SemanticLSTM
@@ -16,7 +15,6 @@ parser = argparse.ArgumentParser(description='Predict using S2VT Model')
 parser.add_argument('--annotation-path', help='File path to annotation', required=True)
 parser.add_argument('--dataset-dir', help='Directory path to test data', required=True)
 parser.add_argument('--out-path', help='Output filepath', required=True)
-parser.add_argument('--timestep', help='Total timestep', default=80, type=int)
 parser.add_argument('--batch-size', help='Batch size for training', default=8, type=int)
 parser.add_argument('--model-path', help='Load pretrained model', required=True)
 parser.add_argument(
@@ -30,7 +28,6 @@ args = parser.parse_args()
 annotation_path = args.annotation_path
 dataset_dir = args.dataset_dir
 out_path = args.out_path
-timestep = args.timestep
 batch_size = args.batch_size
 model_path = args.model_path
 mode = args.mode
@@ -40,7 +37,6 @@ print('\n######### TEST CONFIGURATION #########')
 print('Annotation file:', annotation_path)
 print('Output:', out_path)
 print('Test directory:', dataset_dir)
-print('Timestep:', timestep)
 print('Generate mode:', mode)
 print('Pretrained model path:', model_path)
 print('Batch size:', batch_size)
@@ -59,9 +55,9 @@ model_cnn_3d = checkpoint['model_cnn_3d']
 test_dataset = ExtractedMSVD(
     annotation_path,
     os.path.join(dataset_dir, 'msvd_resnext_eco.npy'),
-    os.path.join(dataset_dir, 'msvd_tag_gt_4_msvd.npy'),
-    timestep=timestep,
-    beta=0.5,
+    os.path.join(dataset_dir, 'msvd_semantic_tag_e1000.npy'),
+    timestep=checkpoint['timestep'],
+    max_sentence_len=25,
     type='test',
 )
 test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=batch_size)
@@ -99,13 +95,7 @@ try:
         out = model(bos_cap, cnn_features, semantic_features, mode=mode)  # (BATCH_SIZE, timestep-1, vocab_size)
 
         for i in range(len(out)):
-            if mode == 'argmax':
-                out_cap = torch.argmax(out[i], dim=1).to(DEVICE).long()
-            else:
-                out_cap = softmax_func(out[i])
-                out_cap = torch.multinomial(out, 1).squeeze(dim=1).to(DEVICE).long()
-
-            out_cap = idx_to_annotation(out_cap.tolist(), test_dataset.idx_to_word)
+            out_cap = idx_to_annotation(out[i].tolist(), test_dataset.idx_to_word)
             grount_truth = idx_to_annotation(gt_cap[i].tolist(), test_dataset.idx_to_word)
 
             out_cap = format_result(out_cap)
@@ -120,3 +110,4 @@ except Exception:
     traceback.print_exc()
 
 # python savc_generate_caption.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --dataset-dir "D:/ML Dataset/MSVD/features" --batch-size 64 --model-path "./checkpoints/savc/1643719115_epoch149_2.704_4.093_vgg_shufflenetv2.pth" --mode argmax --out-path "./payload.json"
+# python savc_generate_caption.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --dataset-dir "D:/ML Dataset/MSVD/downloaded" --batch-size 64 --model-path "./checkpoints/savc/1643990994_resnext_eco_epoch100_2.032_3.019.pth" --mode argmax --out-path "./payload_100_argmax.json"

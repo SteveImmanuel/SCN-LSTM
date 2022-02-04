@@ -195,7 +195,6 @@ def run():
                 'embed_size': model.embed_size
             }
             epsilons = generate_epsilon(epoch)
-            # epsilons = [1.0] * epoch
             batch_loss_log_path = os.path.join(log_dir, f'{uid}_batch_loss.csv')
             epoch_loss_log_path = os.path.join(log_dir, f'{uid}_epoch_loss.csv')
             batch_loss_log = create_batch_log_file(batch_loss_log_path)
@@ -269,7 +268,6 @@ def run():
 
                 model.eval()
                 temp_out = model(temp_cap, temp_cnn_features, temp_semantic_features, mode=mode)[0]
-                temp_out = torch.argmax(temp_out, dim=1).to(DEVICE).long()
                 temp_out = idx_to_annotation(temp_out.tolist(), val_dataset.idx_to_word)
                 temp_cap = idx_to_annotation(temp_cap[0].tolist(), val_dataset.idx_to_word)
                 print('###Current Result###')
@@ -314,3 +312,4 @@ if __name__ == '__main__':
     run()
 
 # python savc_train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --dataset-dir "D:/ML Dataset/MSVD/features" --batch-size 64 --epoch 150 --learning-rate 5e-4 --ckpt-interval 10 --model-cnn-2d "regnety32" --model-cnn-3d "resnext101" --ckpt-dir "./checkpoints/savc" --log-dir "./logs/savc" --mode argmax
+# python savc_train.py --annotation-path "D:/ML Dataset/MSVD/annotations.txt" --dataset-dir "D:/ML Dataset/MSVD/downloaded" --batch-size 64 --epoch 150 --learning-rate 5e-4 --ckpt-interval 10 --model-cnn-2d "resnext" --model-cnn-3d "eco" --ckpt-dir "./checkpoints/savc" --log-dir "./logs/savc" --mode sample --timestep 30
