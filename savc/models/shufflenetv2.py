@@ -197,5 +197,5 @@ if __name__ == "__main__":
         'C:/Users/Steve/Documents/Git/s2vt-implementation/checkpoints/shufflenet/kinetics_shufflenetv2_2.0x_RGB_16_best.pth',
         width_mult=2.,
     )
-    from torchsummary import summary
+    from torchinfo import summary
     summary(model, input_size=(3, 16, 112, 112))

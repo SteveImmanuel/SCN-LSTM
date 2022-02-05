@@ -199,5 +199,5 @@ def get_model(pretrained_path: str, **kwargs):
 
 if __name__ == '__main__':
     model = get_model(pretrained_path='./checkpoints/resnext101/kinetics_resnext_101_RGB_16_best.pth')
-    from torchsummary import summary
+    from torchinfo import summary
     summary(model, input_size=(3, 16, 112, 112))
