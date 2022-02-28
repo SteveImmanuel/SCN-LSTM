@@ -206,6 +206,7 @@ class ExtractedMSVD(Dataset):
         timestep: int = 80,
         max_len: int = -1,
         max_sentence_len: int = 25,
+        include_validation_train: bool = True,
     ) -> None:
         super().__init__()
         assert os.path.exists(cnn_features_path)
@@ -214,6 +215,7 @@ class ExtractedMSVD(Dataset):
         assert timestep >= max_sentence_len
 
         self.type = type
+        self.include_validation_train = include_validation_train
         self.word_to_idx, self.idx_to_word, self.video_caption_mapping = build_vocab(annotation_file)
         self.video_dict = build_video_dict(annotation_file, reverse_key=True)
         self.vocab_size = len(self.word_to_idx)
@@ -226,7 +228,10 @@ class ExtractedMSVD(Dataset):
 
     def __len__(self):
         if self.type == 'train':
-            return 1300
+            if self.include_validation_train:
+                return 1300
+            else:
+                return 1200
         else:
             if self.max_len == -1:
                 return 670
