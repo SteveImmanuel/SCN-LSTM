@@ -195,6 +195,8 @@ def run():
                 'embed_size': model.embed_size
             }
             epsilons = generate_epsilon(epoch)
+            os.makedirs(log_dir, exist_ok=True)
+            os.makedirs(ckpt_dir, exist_ok=True)
             batch_loss_log_path = os.path.join(log_dir, f'{uid}_batch_loss.csv')
             epoch_loss_log_path = os.path.join(log_dir, f'{uid}_epoch_loss.csv')
             batch_loss_log = create_batch_log_file(batch_loss_log_path)
