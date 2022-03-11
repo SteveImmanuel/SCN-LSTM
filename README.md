@@ -66,6 +66,9 @@ python savc_generate_caption.py \
 --batch-size 64 --mode argmax --out-path <OUT_PATH>
 ```
 
+## Evaluation
+To get the score metrics on Blue, CiDEr,  ROUGE_L, and METEOR, generate the captions and use <a href=https://github.com/SteveImmanuel/caption-eval>this</a> repository. 
+
 ## Performance on MSVD
 ### S2VT
 ```
@@ -89,8 +92,8 @@ METEOR: 0.4155076768981118
 ```
 
 ## References
-- https://www.cs.utexas.edu/users/ml/papers/venugopalan.iccv15.pdf
-- https://arxiv.org/pdf/1909.00121.pdf
+- Venugopalan, S., Rohrbach, M., Donahue, J., Mooney, R., Darrell, T., & Saenko, K. (2015). Sequence to sequence - Video to text. Proceedings of the IEEE International Conference on Computer Vision, 2015 Inter, 4534–4542. https://doi.org/10.1109/ICCV.2015.515
+- Chen, H., Lin, K., Maye, A., Li, J., & Hu, X. (2020). A Semantics-Assisted Video Captioning Model Trained With Scheduled Sampling. Frontiers in Robotics and AI, 7, 1–11. https://doi.org/10.3389/frobt.2020.475767
 - https://github.com/WingsBrokenAngel/Semantics-AssistedVideoCaptioning
 - https://github.com/mzolfaghari/ECO-pytorch
 - https://github.com/okankop/Efficient-3DCNNs
