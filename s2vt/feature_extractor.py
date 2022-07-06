@@ -5,28 +5,43 @@ import torchvision.models as models
 from torch.utils.data import DataLoader
 from torchvision.transforms import RandomCrop, Normalize
 from s2vt.dataset import RawMSVDDataset
-from s2vt.constant import *
-from s2vt.utils import build_video_dict
+from constant import *
+from utils import build_video_dict
 
 
-def extract_features(annotations_file: str, root_path: str, output_dir: str, batch_size: int = 32) -> None:
+def extract_features(
+    model_type: str,
+    annotations_file: str,
+    root_path: str,
+    output_dir: str,
+    batch_size: int = 32,
+) -> None:
     """Extract cnn features from each frame on all videos in the dataset into npy files
 
     Args:
+        model_type (str): backbone architecture to extract the features
         annotations_file (str)
         root_path (str): dataset root path
         output_dir (str)
         batch_size (int, optional). Defaults to 32.
     """
     os.makedirs(output_dir, exist_ok=True)
-    vgg = models.vgg16(pretrained=True).to(DEVICE)
-    # use output from fc7, remove the rest
-    vgg.classifier = torch.nn.Sequential(*list(vgg.classifier.children())[:-1])
-    vgg.eval()
 
+    if model_type == 'vgg':
+        model = models.vgg16(pretrained=True).to(DEVICE)
+        # use output from fc7, remove the rest
+        model.classifier = torch.nn.Sequential(*list(model.classifier.children())[:-1])
+    elif model_type == 'regnety32':
+        model = models.regnet_y_32gf(pretrained=True).to(DEVICE)
+        # remove last layer
+        model.fc = torch.nn.Identity()
+    else:
+        assert False, f'Unsupported model {model_type}'
+
+    model.eval()
     all_videos = os.listdir(root_path)
     video_dict = build_video_dict(annotations_file)
-    preprocess_funcs = [Normalize(VGG_MEAN, VGG_STD), RandomCrop(227)]
+    preprocess_funcs = [Normalize(IMAGE_MEAN, IMAGE_STD), RandomCrop(227)]
 
     for idx, video in enumerate(all_videos):
         print(f'Extracting video {idx+1}/{len(all_videos)}', end='\r')
@@ -34,12 +49,12 @@ def extract_features(annotations_file: str, root_path: str, output_dir: str, bat
         output_video_path = os.path.join(output_dir, f'{video_index:04d}')
         os.makedirs(output_video_path, exist_ok=True)
 
-        raw_dataset = RawMSVDDataset(os.path.join(root_path, video), video_dict, preprocess_funcs)
+        raw_dataset = RawMSVDDataset(os.path.join(root_path, video), preprocess_funcs)
         data_loader = DataLoader(raw_dataset, batch_size=batch_size, shuffle=False)
 
         for batch_idx, (X, _) in enumerate(data_loader):
             X = X.to(DEVICE)
-            out = vgg(X)
+            out = model(X)
             out_numpy = out.cpu().detach().numpy()
 
             for i in range(out_numpy.shape[0]):
@@ -91,3 +106,13 @@ def parse_features_from_txt(feature_file: str, output_dir: str) -> None:
             line = f.readline()
 
     print('\nParse complete')
+
+
+if __name__ == '__main__':
+    extract_features(
+        'regnety32',
+        'D:/ML Dataset/MSVD/annotations.txt',
+        'D:/ML Dataset/MSVD/YouTubeClips',
+        'D:/ML Dataset/MSVD/regnety32_extracted',
+        batch_size=8,
+    )

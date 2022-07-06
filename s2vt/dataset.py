@@ -6,7 +6,7 @@ import torch
 from torchvision.io import read_image
 from torch.utils.data import Dataset
 from typing import List
-from s2vt.utils import *
+from utils import *
 
 
 class RawMSVDDataset(Dataset):
@@ -16,14 +16,12 @@ class RawMSVDDataset(Dataset):
     def __init__(
         self,
         video_path: str,
-        video_dict: Dict,
         transform: List = None,
     ):
         assert os.path.exists(video_path)
         self.video_path = video_path
         self.images = sorted(os.listdir(video_path))
         self.transform = transform
-        self.video_dict = video_dict
 
     def __len__(self):
         return len(self.images)
@@ -58,6 +56,7 @@ class PreprocessedMSVDDataset(Dataset):
         self.video_dict = build_video_dict(annotation_file, reverse_key=True)
         self.vocab_size = len(self.word_to_idx)
         self.timestep = timestep
+        self.timestep_weight = torch.FloatTensor([math.log((0.4 * i + 5) / 5) + 1 for i in range(timestep)])
 
     def __len__(self):
         return len(self.videos)
@@ -103,9 +102,11 @@ class PreprocessedMSVDDataset(Dataset):
                 torch.ones(len(annot_raw) - 1),  # annotation + EOS tag
                 torch.zeros(self.timestep - len(annot_raw)),
             ],
-            0).long()
+            0,
+        ).long()
+        weighted_mask = annot_mask * self.timestep_weight
 
-        return (video_data, (label_annotation, annot_mask))
+        return (video_data, (label_annotation, weighted_mask))
 
 
 class EndToEndMSVDDataset(Dataset):

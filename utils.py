@@ -2,17 +2,90 @@ import cv2
 import os
 import shutil
 from typing import Tuple, Dict, List
-from s2vt.constant import *
+from constant import *
+
+
+def generate_epsilon(total_epoch: int) -> List[float]:
+    """Generate sampling probability for each epoch for SAVC model
+
+    Args:
+        total_epoch (int):
+
+    Returns:
+        List:
+    """
+    res = []
+
+    threshold = 50
+    for i in range(threshold):
+        res.append(1.0)
+
+    for i in range(threshold, total_epoch):
+        res.append(1 - (i - threshold + 1) / (total_epoch - threshold + 1) * (1 - 0.4))
+    return res
+
+
+def count_word_occurence(annotation_file: str) -> Dict:
+    """Count all word occurence in annotation_file to build tags.
+
+    Args:
+        annotation_file (str): 
+
+    Returns:
+        Dict: 
+    """
+    res = {}
+    with open(annotation_file, 'r') as annot:
+        line = annot.readline()
+        while line:
+            line = line.strip('\n')
+            tokens = line.split(' ')[1:]
+            for token in tokens:
+                if token in res:
+                    res[token] += 1
+                else:
+                    res[token] = 1
+            line = annot.readline()
+
+    return dict(sorted(res.items(), key=lambda item: item[1], reverse=True))
+
+
+def build_tags(annotation_file: str, num_tags: int = SEMANTIC_SIZE, reverse_key: bool = False) -> Dict:
+    """Build tag dictionary consisting of top num_tags words in terms of occurence
+    in annotation_file
+
+    Args:
+        annotation_file (str): 
+        num_tags (int, optional): . Defaults to 750.
+
+    Returns:
+        Dict: 
+    """
+    tags = count_word_occurence(annotation_file)
+    for word in BLACKLIST_WORDS:
+        tags.pop(word, None)
+
+    tags = list(tags.items())[:num_tags]
+    idx = 0
+
+    res = {}
+    for tag in tags:
+        res[idx] = tag
+        idx += 1
+
+    if reverse_key:
+        return {val: key for key, val in res.items()}
+    return res
 
 
 def build_video_dict(annotation_file: str, reverse_key: bool = False) -> Dict:
     """Create video index mapping
 
     Args:
-        annotation_file (str): [description]
+        annotation_file (str): 
 
     Returns:
-        Dict: [description]
+        Dict: 
     """
     video_dict = {}
     with open(annotation_file, 'r') as annot:
@@ -39,7 +112,7 @@ def build_vocab(annotation_file: str) -> Tuple[Dict, Dict, Dict]:
     """Build vocab for annotation_file
 
     Args:
-        annotation_file (str): [description]
+        annotation_file (str): 
     Returns:
         (word_to_idx dict, idx_to_word dict, video_mapping dict)
     """
@@ -77,10 +150,10 @@ def annotation_to_idx(annotation: List[str], word_to_idx: Dict) -> List[int]:
     """Converts str annotation into integer indexes
 
     Args:
-        annotation (List[str]): [description]
+        annotation (List[str]): 
 
     Returns:
-        List[int]: [description]
+        List[int]: 
     """
     return [word_to_idx[x] if x in word_to_idx else -1 for x in annotation]
 
@@ -89,10 +162,10 @@ def idx_to_annotation(idxs: List[int], idx_to_word: Dict) -> List[str]:
     """Converts integer indexes into annotation
 
     Args:
-        annotation (List[str]): [description]
+        annotation (List[str]): 
 
     Returns:
-        List[int]: [description]
+        List[int]: 
     """
     return [idx_to_word[x] if x in idx_to_word else UNKNOWN_TAG for x in idxs]
 
@@ -101,8 +174,8 @@ def video_to_frames(root_path: str = '.', output_dim: Tuple = (224, 224)) -> Non
     """Converts all videos in root_path to sequence of images to each own directory
 
     Args:
-        root_path (str, optional): [description]. Defaults to '.'.
-        output_dim (Tuple, optional): [description]. Defaults to (224, 224).
+        root_path (str, optional): . Defaults to '.'.
+        output_dim (Tuple, optional): . Defaults to (224, 224).
     """
     allowed_ext = ['.avi', '.mp4']
 
@@ -131,7 +204,7 @@ def frames_to_video(root_path: str = '.') -> None:
     to videos. This is the reverse of video_to_frames function
 
     Args:
-        root_path (str, optional): [description]. Defaults to '.'.
+        root_path (str, optional): . Defaults to '.'.
     """
     allowed_ext = ['.tif', '.jpg', '.jpeg', '.png']
 
@@ -164,21 +237,27 @@ def split_train_val_test(root_path: str = '.') -> None:
     and video 1301-1970 will be for testing 
 
     Args:
-        root_path (str, optional): [description]. Defaults to '.'.
+        root_path (str, optional): . Defaults to '.'.
     """
     videos = sorted(os.listdir(root_path))
-    subdir = {'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}
+    subdir = {'train_val': [0, 1299], 'train': [0, 1199], 'validation': [1200, 1299], 'testing': [1300, 1969]}
 
     for subdir_name, index_range in subdir.items():
         os.makedirs(os.path.join(root_path, subdir_name), exist_ok=True)
         for i in range(index_range[0], index_range[1] + 1):
             source_path = os.path.join(root_path, videos[i])
             dest_path = os.path.join(root_path, subdir_name, videos[i])
-            shutil.move(source_path, dest_path)
+
+            if subdir_name == 'train_val':
+                shutil.copy(source_path, dest_path)
+            else:
+                shutil.move(source_path, dest_path)
 
 
 if __name__ == '__main__':
-    # video_to_frames('D:\ML Dataset\MSVD\YouTubeClips', (256, 256))
-    split_train_val_test('C:\MSVD_extracted')
-    # a = build_video_dict('D:/ML Dataset/MSVD/annotations.txt')
-    # print(a)
+    cnn2d_model = ['regnetx32', 'vgg']
+    cnn3d_model = ['shufflenetv2', 'shufflenet']
+
+    for model_2d in cnn2d_model:
+        for model_3d in cnn3d_model:
+            split_train_val_test(f'D:/ML Dataset/MSVD/features/{model_2d}_{model_3d}/semantics')

@@ -1,7 +1,7 @@
 import torch
 import torchvision.models as models
 from typing import Tuple, Dict
-from s2vt.constant import *
+from constant import *
 
 
 class S2VT(torch.nn.Module):

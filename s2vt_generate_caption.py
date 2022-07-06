@@ -7,8 +7,8 @@ from datetime import datetime
 from torch.utils.data import DataLoader
 from s2vt.dataset import PreprocessedMSVDDataset
 from s2vt.model import S2VT
-from s2vt.utils import idx_to_annotation
-from s2vt.constant import *
+from utils import idx_to_annotation
+from constant import *
 from helper import *
 
 parser = argparse.ArgumentParser(description='Predict using S2VT Model')
