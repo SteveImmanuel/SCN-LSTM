@@ -11,7 +11,7 @@ from s2vt.utils import *
 
 class RawMSVDDataset(Dataset):
     """
-    Raw image only
+    Raw image only, for feature extraction
     """
     def __init__(
         self,

@@ -10,6 +10,14 @@ from s2vt.utils import build_video_dict
 
 
 def extract_features(annotations_file: str, root_path: str, output_dir: str, batch_size: int = 32) -> None:
+    """Extract cnn features from each frame on all videos in the dataset into npy files
+
+    Args:
+        annotations_file (str)
+        root_path (str): dataset root path
+        output_dir (str)
+        batch_size (int, optional). Defaults to 32.
+    """
     os.makedirs(output_dir, exist_ok=True)
     vgg = models.vgg16(pretrained=True).to(DEVICE)
     # use output from fc7, remove the rest
@@ -43,6 +51,13 @@ def extract_features(annotations_file: str, root_path: str, output_dir: str, bat
 
 
 def parse_features_from_txt(feature_file: str, output_dir: str) -> None:
+    """Parse extracted features from txt files into npy files.
+    This function is used for the provided extracted features from the original paper implementation.
+
+    Args:
+        feature_file (str)
+        output_dir (str)
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     video_set = set()
